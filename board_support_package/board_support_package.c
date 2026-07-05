@@ -86,6 +86,8 @@ uint32_t init_hardware(void){
         }
     }
 
+    static volatile uint32_t tst;
+    tst++;
     if (!terminal_init()) {
         test_hardware_result |= _B_FAULT_TERMINAL_;
     }
