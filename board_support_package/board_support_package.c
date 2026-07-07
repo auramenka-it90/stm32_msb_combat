@@ -14,6 +14,7 @@
 #include "terminal.h"
 #include "fcs.h" 	/* Required to invoke fcs_init_fpga_hardware() and access fcs_state */
 #include "host.h" 	/* ADDED: Access to UART DMA driver APIs */
+#include "configuration.h"
 
 /* Global hardware test result variable */
 uint32_t test_hardware_result = _B_TEST_HARDWARE_SUCCESS_;
@@ -28,13 +29,18 @@ Pin_Mgmt_Config_t pin = {
 
 /**
   * @brief  Securely initializes all hardware components in the proper sequence.
-  *         Handles hardware reset, SPI bridge setup, and link integrity verification.
+  * Handles hardware reset, SPI bridge setup, and link integrity verification.
   * @retval Current hardware status register
   */
 uint32_t init_hardware(void){
 
     /* CRITICAL: Reset the global status before starting test sequence to allow retries */
     test_hardware_result = _B_TEST_HARDWARE_SUCCESS_;
+
+    /* Read and verify system configuration from Flash memory */
+    if (!get_dev_cfg()) {
+        test_hardware_result |= _B_FAULT_CFG_;
+    }
 
     /* 1. PINS CONFIGURATION */
     if (PIN_MGMT_Init(&pin) != osOK) {

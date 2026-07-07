@@ -20,6 +20,7 @@
 
 #include 	"pin_mgmt.h"
 #include	"terminal_signals.h"
+#include 	"configuration.h"
 
 
 /* Main terminal UART handle structure */
@@ -182,7 +183,7 @@ static void FlushInBuffer(void) {
 /* ========================================================================= */
 
 static dboolean sys_SaveSettings(void) {
-	bool result = dtrue;
+	bool result = save_setting();
 	return result;
 }
 

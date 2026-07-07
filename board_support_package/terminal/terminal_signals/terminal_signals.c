@@ -1,10 +1,10 @@
-
 #include	"dspa.h"
 #include	"dspa_defs.h"
 #include 	"dspa_sigdefs.h"
 
 #include	"terminal_signals.h"
 #include 	"fcs.h"
+#include    "configuration.h" /* Added to access dev_cfg */
 
 static	char *sDEV = "";
 static 	char *sFCSIN = "";
@@ -21,6 +21,7 @@ uint32_t terminal_override_values = 0x00000000U;
 SIGNALS_BEGIN(DSPA_SIGNALS_NAME)
 	_STRING_R_  ("FCS", sDEV, NULL),
 		_U32_R_	("Test hardware",	test_hardware_result,&sDEV),
+		_U16_R_ ("Boot counter",    dev_cfg.item.boot_counter, &sDEV), /* Power-on counter from Flash */
 		_STRING_R_	("FCS input ", sFCSIN, &sDEV),
 			_U16_R_("distance[m]", fcs_state.distance_meters, &sFCSIN),
 			_BYTE_R_("ammo type", fcs_state.ammo_type, &sFCSIN),
@@ -58,21 +59,15 @@ SIGNALS_BEGIN(DSPA_SIGNALS_NAME)
 			_U32_R_ ("host rx xor err", host_stats.rx_xor_err, &sDEBUG), /* Ошибки XOR (помехи на шине) */
 SIGNALS_END(DSPA_SIGNALS_NAME)
 
-
-
-
-
 int	init_terminal_signals(void){
 	return	SIG_INIT(DSPA_SIGNALS_NAME);
 }
 
-
 /*
- * 	Reaction to changes in FPGA control signals (eAssist)
+ * Reaction to changes in FPGA control signals (eAssist)
  */
 void signal_change_handler(void *s) {
 	if ((s==&terminal_override_mask)|| (s==&terminal_override_values)){
 		fcs_apply_terminal_override(terminal_override_mask, terminal_override_values);
 	}
-
 }
