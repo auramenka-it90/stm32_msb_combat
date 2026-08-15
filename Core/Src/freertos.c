@@ -2,7 +2,8 @@
 /**
   ******************************************************************************
   * File Name          : freertos.c
-  * Description        : Code for freertos applications
+  * Description        : Code for FreeRTOS applications (MainAppl)
+  *                      Strictly aligned with Bootloader synchronization architecture.
   ******************************************************************************
   * @attention
   *
@@ -30,8 +31,6 @@
 #include "terminal.h"               /* Safe Terminal control include */
 #include "fpga_control.h"
 #include "fcs.h"
-
-
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -41,7 +40,8 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-
+/* Synchronization flag to release tasks after hardware POST */
+#define TASK_START_FLAG 0x01U
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -54,10 +54,11 @@
 /* Extern declarations to access analog values from board_support_package.c */
 extern float cpu_temperature;
 extern float adc_voltage;
-uint32_t fcs_task_counter;
+uint32_t fcs_task_counter = 0;
 
 extern FPGA_HandleTypeDef hfpga_bridge;
 /* USER CODE END Variables */
+
 /* Definitions for defaultTask */
 osThreadId_t defaultTaskHandle;
 const osThreadAttr_t defaultTask_attributes = {
@@ -65,6 +66,7 @@ const osThreadAttr_t defaultTask_attributes = {
   .stack_size = 1024 * 4,
   .priority = (osPriority_t) osPriorityAboveNormal,
 };
+
 /* Definitions for TerminalTask */
 osThreadId_t TerminalTaskHandle;
 const osThreadAttr_t TerminalTask_attributes = {
@@ -72,6 +74,7 @@ const osThreadAttr_t TerminalTask_attributes = {
   .stack_size = 1024 * 4,
   .priority = (osPriority_t) osPriorityNormal,
 };
+
 /* Definitions for TemperatureTask */
 osThreadId_t TemperatureTaskHandle;
 const osThreadAttr_t TemperatureTask_attributes = {
@@ -134,7 +137,6 @@ void MX_FREERTOS_Init(void) {
   /* USER CODE BEGIN RTOS_EVENTS */
   /* add events, ... */
   /* USER CODE END RTOS_EVENTS */
-
 }
 
 /* USER CODE BEGIN Header_StartDefaultTask */
@@ -147,30 +149,35 @@ void MX_FREERTOS_Init(void) {
 void StartDefaultTask(void *argument)
 {
   /* USER CODE BEGIN StartDefaultTask */
-	/* Infinite loop */
 
-	osThreadSuspend(TemperatureTaskHandle);
-	osThreadSuspend(TerminalTaskHandle);
-
+	/* 1. Run board-level POST and hardware initialization */
 	init_hardware();
 
+	/* 2. Cascade start tasks based on POST diagnostic results using Thread Flags */
+	if (test_status_hardware(_B_FAULT_TERMINAL_)) {
+		osThreadFlagsSet(TerminalTaskHandle, TASK_START_FLAG);
+	}
+
+	if (test_status_hardware(_B_FAULT_PINS_)) {
+		osThreadFlagsSet(TemperatureTaskHandle, TASK_START_FLAG);
+	}
+
+	/* 3. Operational Branch vs Error Loop */
 	if (get_status_hardware() == _B_TEST_HARDWARE_SUCCESS_) {
-		osThreadResume(TerminalTaskHandle);
-		osThreadResume(TemperatureTaskHandle);
-
-		/*	all right !!!	*/
+		/* All hardware tests passed: Enter main FCS real-time loop */
 		for (;;) {
-			fcs_task();	/* 10 ms period */
+			fcs_task();              /* 10 ms periodic FCS execution */
 			++fcs_task_counter;
+			PIN_Toggle_F(&pin_tp1);   /* Fast Test Point 1 heartbeat toggle */
 		}
-
 	} else {
-		/*	error -> red led 1Hz blink  */
-		FPGA_Debug_Write_LEDs(&hfpga_bridge, ON, OFF, OFF, 10);
-		osDelay(500);
-		FPGA_Debug_Write_LEDs(&hfpga_bridge, OFF, OFF, OFF, 10);
-		osDelay(500);
-
+		/* Hardware fault detected: Blink FPGA Red LED at 1 Hz indefinitely */
+		for (;;) {
+			FPGA_Debug_Write_LEDs(&hfpga_bridge, ON, OFF, OFF, 10);
+			osDelay(500);
+			FPGA_Debug_Write_LEDs(&hfpga_bridge, OFF, OFF, OFF, 10);
+			osDelay(500);
+		}
 	}
   /* USER CODE END StartDefaultTask */
 }
@@ -185,6 +192,9 @@ void StartDefaultTask(void *argument)
 void StartTerminalTask(void *argument)
 {
   /* USER CODE BEGIN StartTerminalTask */
+	/* Wait for authorization flag from defaultTask. Task sleeps with 0 CPU load. */
+	osThreadFlagsWait(TASK_START_FLAG, osFlagsWaitAny, osWaitForever);
+
 	/* Infinite loop */
 	for (;;) {
 		terminal_task();
@@ -202,6 +212,9 @@ void StartTerminalTask(void *argument)
 void StartTemperatureTask(void *argument)
 {
   /* USER CODE BEGIN StartTemperatureTask */
+	/* Wait for authorization flag from defaultTask. Task sleeps with 0 CPU load. */
+	osThreadFlagsWait(TASK_START_FLAG, osFlagsWaitAny, osWaitForever);
+
 	/* Infinite loop */
 	for (;;) {
 		/* Read CPU internal core temperature every 100 ms */
@@ -215,4 +228,3 @@ void StartTemperatureTask(void *argument)
 /* USER CODE BEGIN Application */
 
 /* USER CODE END Application */
-

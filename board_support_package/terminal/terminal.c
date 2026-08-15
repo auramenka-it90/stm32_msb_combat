@@ -64,7 +64,7 @@ bool terminal_init(void) {
 	SYS_Config.FuncPtr_SelfTest = &sys_SelfTest;
 	SYS_Config.FuncPtr_SysReset = &sys_Reset;
 
-	SYS_Config.system_info = device_info_create();
+	SYS_Config.system_info = (char*)get_device_info();
 
 	SYS_Init(&SYS_Config);
 

@@ -21,7 +21,7 @@ uint32_t terminal_override_values = 0x00000000U;
 SIGNALS_BEGIN(DSPA_SIGNALS_NAME)
 	_STRING_R_  ("FCS", sDEV, NULL),
 		_U32_R_	("Test hardware",	test_hardware_result,&sDEV),
-		_U16_R_ ("Boot counter",    dev_cfg.item.boot_counter, &sDEV), /* Power-on counter from Flash */
+		//_U16_R_ ("Boot counter",    dev_cfg.item.boot_counter, &sDEV), /* Power-on counter from Flash */
 		_STRING_R_	("FCS input ", sFCSIN, &sDEV),
 			_U16_R_("distance[m]", fcs_state.distance_meters, &sFCSIN),
 			_BYTE_R_("ammo type", fcs_state.ammo_type, &sFCSIN),

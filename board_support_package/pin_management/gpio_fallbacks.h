@@ -1,7 +1,7 @@
 /**
  * ******************************************************************************
  * @file    gpio_fallbacks.h
- * @brief   Fallback definitions for all GPIO pins of the current project.
+ * @brief   Fallback definitions for all GPIO pins of the MainAppl project.
  *          Ensures each pin macro has a safe default value based on main.h.
  *          All comments in English.
  * ******************************************************************************
@@ -113,7 +113,7 @@ extern "C" {
 #define SPI1_FPGA_MOSI_GPIO_Port    GPIOA
 #endif
 
-/* STM32 to FPGA MISC/NSS Communication lines (Updated for main.h) */
+/* STM32 to FPGA MISC/NSS Communication lines */
 #ifndef STM32_2_FPGA_NSS_P_Pin
 #define STM32_2_FPGA_NSS_P_Pin      GPIO_PIN_0
 #endif

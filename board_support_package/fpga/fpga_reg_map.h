@@ -51,6 +51,10 @@
  *               Directly mapped to physical FPGA output pins: led[2:0]
  *               1 = LED On, 0 = LED Off
  *
+ * Bit 3       : RS-485 / UART Multiplexer Channel Select
+ *               0 = Channel 1 (Transceiver DD19: tx2, rx2, de2)
+ *               1 = Channel 2 (Transceiver DD20: tx3, rx3, de3)
+ *
  * Bits [11:4] : Programmable Tick Timer Divider value (debounce/hold clock rate)
  *               Controls the divisor period of the 1 ms reference tick clock.
  *               Generates 'tick_out_pulse' which controls:
@@ -64,6 +68,11 @@
 #define FPGA_DEBUG_MISC_LED_RED        0x04U // VD37 (Red) - Bit 2
 #define FPGA_DEBUG_MISC_LED_MASK       (FPGA_DEBUG_MISC_LED_GREEN | FPGA_DEBUG_MISC_LED_YELLOW | FPGA_DEBUG_MISC_LED_RED)
 
+/* UART Multiplexer Bit 3 */
+#define FPGA_DEBUG_MISC_UART_MUX_MASK  0x0008U // RS-485 Channel Select - Bit 3
+#define FPGA_DEBUG_MISC_UART_MUX_SHIFT 3U
+
+/* Programmable Tick Timer Divider Bits [11:4] */
 #define FPGA_DEBUG_MISC_TICK_DIV_MASK  0x0FF0U
 #define FPGA_DEBUG_MISC_TICK_DIV_SHIFT 4U
 

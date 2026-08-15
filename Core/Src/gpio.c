@@ -54,9 +54,6 @@ void MX_GPIO_Init(void)
   HAL_GPIO_WritePin(GPIOC, LED_GREEN_Pin|TP1_Pin|TP2_Pin|TP3_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(SP1_FPGA_CSO_GPIO_Port, SP1_FPGA_CSO_Pin, GPIO_PIN_SET);
-
-  /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOB, STM32_2_FPGA_NSS_P_Pin|STM32_2_FPGA_NSS_D_Pin, GPIO_PIN_SET);
 
   /*Configure GPIO pin Output Level */
@@ -78,18 +75,11 @@ void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(TP4_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pin : DONE_Pin */
-  GPIO_InitStruct.Pin = DONE_Pin;
+  /*Configure GPIO pins : DONE_Pin SP1_FPGA_CSO_Pin */
+  GPIO_InitStruct.Pin = DONE_Pin|SP1_FPGA_CSO_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
-  HAL_GPIO_Init(DONE_GPIO_Port, &GPIO_InitStruct);
-
-  /*Configure GPIO pin : SP1_FPGA_CSO_Pin */
-  GPIO_InitStruct.Pin = SP1_FPGA_CSO_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
-  HAL_GPIO_Init(SP1_FPGA_CSO_GPIO_Port, &GPIO_InitStruct);
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
   /*Configure GPIO pin : STM32_2_FPGA_NSS_P_Pin */
   GPIO_InitStruct.Pin = STM32_2_FPGA_NSS_P_Pin;

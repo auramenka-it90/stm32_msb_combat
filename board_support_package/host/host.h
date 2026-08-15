@@ -1,13 +1,11 @@
 /**
-  ******************************************************************************
-  * @file    host.h
-  * @brief   Consolidated declarations for MSB <-> BC high-speed UART
-  *          communication channel (USART2, 921600 Baud).
-  *          Combines packed packet structures, thread-safe DMA UART driver
-  *          and communication statistics.
-  *          All comments in English.
-  ******************************************************************************
-  */
+ ******************************************************************************
+ * @file    host.h
+ * @brief   Consolidated declarations for MSB <-> BC high-speed UART
+ *          communication channel (USART2, 921600 Baud, 8E1).
+ *          All comments in ASCII English.
+ ******************************************************************************
+ */
 
 #ifndef HOST_H
 #define HOST_H
@@ -16,14 +14,15 @@
 extern "C" {
 #endif
 
-#include "board_support_package.h" // Access to huart2 handle and base system APIs
-#include "fcs.h"                   // Access to FCS_State_t and FCS_Control_Commands_t
+#include "board_support_package.h"
+#include "fcs.h"
 #include <stdint.h>
 #include <stdbool.h>
 
-//=============================================================================
-//  UART & PROTOCOL CONSTANTS
-//=============================================================================
+/* ========================================================================= */
+/*  UART & PROTOCOL CONSTANTS                                                */
+/* ========================================================================= */
+
 #define MSB_UART_BAUDRATE      921600U
 #define MSB_PACKET_SIZE        32U
 #define MSB_DATA_SIZE          28U
@@ -38,9 +37,10 @@ extern "C" {
 #define HOST_RX_BUF_SIZE       128U   // Size of double packet receive DMA buffer
 #define HOST_TX_BUF_SIZE       128U   // Size of thread-safe transmit DMA buffer
 
-//=============================================================================
-//  COMMUNICATION STATISTICS STRUCTURE
-//=============================================================================
+/* ========================================================================= */
+/*  COMMUNICATION STATISTICS STRUCTURE                                       */
+/* ========================================================================= */
+
 typedef struct {
     uint32_t tx_count;      // Total transmitted packets (MSB -> BC)
     uint32_t rx_count;      // Total successfully received packets (BC -> MSB)
@@ -49,22 +49,20 @@ typedef struct {
 } Host_Stats_t;
 
 /* Global statistics and connection trackers */
-extern  Host_Stats_t host_stats;
-extern volatile bool is_bc_link_error;       // true if Ballistic Computer connection is lost
-extern volatile uint32_t last_bc_packet_tick; // Last system tick when a valid packet was decoded
+extern Host_Stats_t      host_stats;
+extern volatile bool     is_bc_link_error;
+extern volatile uint32_t last_bc_packet_tick;
 
-//=============================================================================
-//  PACKET STRUCTURE DEFINITIONS (PACKED)
-//=============================================================================
+/* ========================================================================= */
+/*  PACKET STRUCTURE DEFINITIONS (PACKED)                                    */
+/* ========================================================================= */
 
 /**
  * @brief  Byte 3 Flags Part 1 Union (MSB -> BC)
  */
-typedef union
-{
+typedef union {
     uint8_t raw;
-    struct __attribute__((packed))
-    {
+    struct __attribute__((packed)) {
         uint8_t cc      : 1;   // bit 0: Double command override
         uint8_t dc      : 1;   // bit 1: Target designation (ЦУ)
         uint8_t srd     : 1;   // bit 2: Set/Reset Distance status (JK latch output)
@@ -78,29 +76,25 @@ typedef union
 
 /**
  * @brief  Byte 4 Flags Part 2 Union (MSB -> BC)
- *         Bits 6 and 7 transmit scf_on and scf_on_add states.
  */
-typedef union
-{
+typedef union {
     uint8_t raw;
-    struct __attribute__((packed))
-    {
+    struct __attribute__((packed)) {
         uint8_t k1          : 1;   // bit 0: Control status
         uint8_t btn_cannon  : 1;   // bit 1: Cannon trigger button pressed
         uint8_t rf          : 1;   // bit 2: Reset Filters
         uint8_t ur          : 1;   // bit 3: Sight unlatch
         uint8_t rem         : 1;   // bit 4: Rocket elevation permission
         uint8_t df          : 1;   // bit 5: Code DF active
-        uint8_t scf_on      : 1;   // bit 6: SCF_ON hardware state (Modified RFU)
-        uint8_t scf_on_add  : 1;   // bit 7: SCF_ON_ADD hardware state (Modified RFU)
+        uint8_t scf_on      : 1;   // bit 6: SCF_ON hardware state
+        uint8_t scf_on_add  : 1;   // bit 7: SCF_ON_ADD hardware state
     } bits;
 } MSB_Flags2_t;
 
 /**
  * @brief  Detailed 28-byte Data Field structure (MSB -> BC)
  */
-typedef struct __attribute__((packed))
-{
+typedef struct __attribute__((packed)) {
     uint16_t distance;            // bytes 0..1: Target distance (1 LSB = 5 m)
     uint8_t  ammo_type;           // byte 2: Ammo Type (bits 0..3)
     uint8_t  flags1;              // byte 3: Flags Part 1
@@ -111,11 +105,9 @@ typedef struct __attribute__((packed))
 /**
  * @brief  Byte 0 Control Flags Union (BC -> MSB)
  */
-typedef union
-{
+typedef union {
     uint8_t raw;
-    struct __attribute__((packed))
-    {
+    struct __attribute__((packed)) {
         uint8_t ena_shooting      : 1;   // bit 0: Shooting permitted
         uint8_t gmee              : 1;   // bit 1: Rocket elevation enabled
         uint8_t range_over_1280   : 1;   // bit 2: Target distance > 1280 m
@@ -130,8 +122,7 @@ typedef union
 /**
  * @brief  Detailed 28-byte Data Field structure (BC -> MSB)
  */
-typedef struct __attribute__((packed))
-{
+typedef struct __attribute__((packed)) {
     uint8_t  flags;               // byte 0: BC Control Flags
     uint8_t  reserved[27];        // bytes 1..27: Reserved padding (always 0x00)
 } BC_Data_t;
@@ -139,8 +130,7 @@ typedef struct __attribute__((packed))
 /**
  * @brief  Generic 32-byte physical packet frame layout (MSB <-> BC)
  */
-typedef struct __attribute__((packed))
-{
+typedef struct __attribute__((packed)) {
     uint8_t  start;               // byte 0: Start Header (0xAA or 0x55)
     uint8_t  data[MSB_DATA_SIZE]; // bytes 1..28: Processed payload data field
     uint8_t  crc_l;               // byte 29: CRC16 Little-Endian LSB
@@ -148,54 +138,20 @@ typedef struct __attribute__((packed))
     uint8_t  xor_all;             // byte 31: Cumulative XOR checksum
 } MSB_Packet_t;
 
-//=============================================================================
-//  THREAD-SAFE DMA UART DRIVER & HOST SYSTEM API
-//=============================================================================
+/* ========================================================================= */
+/*  PUBLIC API PROTOTYPES                                                    */
+/* ========================================================================= */
 
-/**
- * @brief  Initializes UART driver, mutexes and semaphores.
- * @param  huart: Pointer to HAL UART handle (USART2)
- * @return true if success
- */
-bool host_uart_init(UART_HandleTypeDef *huart);
+bool				host_uart_init(UART_HandleTypeDef *huart);
+void				host_uart_start_receive(void);
+bool				host_uart_send_raw(const uint8_t *data, uint16_t len);
+UART_HandleTypeDef*	host_uart_get_handle(void);
+void				host_send_msb_packet(const FCS_State_t *state);
 
-/**
- * @brief  Starts DMA reception in ReceiveToIdle mode.
- */
-void host_uart_start_receive(void);
-
-/**
- * @brief  Sends a raw byte array via DMA with thread safety and OS sleep block.
- * @param  data: Pointer to data array
- * @param  len: Data length
- * @return true if transmission started successfully
- */
-bool host_uart_send_raw(const uint8_t *data, uint16_t len);
-
-/**
- * @brief  Retrieves the registered active UART handle.
- */
-UART_HandleTypeDef* host_uart_get_handle(void);
-
-/**
- * @brief  Encodes current FCS state, builds the 32-byte packet,
- *         and starts thread-safe DMA transmission.
- * @param  state: Pointer to the active FCS state structure
- */
-void host_send_msb_packet(const FCS_State_t *state);
-
-//=============================================================================
-//  INTERRUPT HANDLERS (Call from HAL callbacks or it.c)
-//=============================================================================
-
-/** Handle RX Event (Idle line detected or buffer filled) */
-void host_uart_rx_event_handler(UART_HandleTypeDef *huart, uint16_t Size);
-
-/** Handle TX complete event */
-void host_uart_tx_complete_handler(UART_HandleTypeDef *huart);
-
-/** Handle UART hardware errors (Overruns, noise, framing errors) */
-void host_uart_error_handler(UART_HandleTypeDef *huart);
+/* Interrupt Handlers */
+void				host_uart_rx_event_handler(UART_HandleTypeDef *huart, uint16_t Size);
+void				host_uart_tx_complete_handler(UART_HandleTypeDef *huart);
+void				host_uart_error_handler(UART_HandleTypeDef *huart);
 
 #ifdef __cplusplus
 }
