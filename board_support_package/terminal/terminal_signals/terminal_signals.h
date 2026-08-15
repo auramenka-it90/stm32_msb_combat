@@ -3,8 +3,10 @@
 #define TERMINAL_SIGNALS_H_
 
 #include	"board_support_package.h"
-#include 	"fcs.h"
 #include 	"host.h"
+#include 	"fcs.h"
+#include    "configuration.h" /* Added to access dev_cfg */
+
 
 #define		DSPA_SIGNALS_NAME		dspa
 
@@ -13,13 +15,11 @@
 extern	uint32_t	test_hardware_result;
 
 
-
-
 //	ADC
 extern	float adc_voltage;
 extern	float	cpu_temperature;
 
-//	FCS counterr
+//	FCS counter
 extern 	uint32_t fcs_task_counter;
 
 int	init_terminal_signals(void);
