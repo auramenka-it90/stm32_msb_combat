@@ -76,6 +76,12 @@ uint8_t		STLINK_Is_Connected(void);
 osStatus_t	PIN_Delay(uint32_t ms);
 osStatus_t	PIN_Blink(const Pin_Descriptor_t *pin, uint8_t count, uint32_t delay_ms);
 
+/* FPGA & SPI bus controls */
+osStatus_t	FPGA_Reset_With_Check(uint32_t reset_time_ms, uint32_t timeout_ms);
+osStatus_t	FPGA_Wait_Ready(uint32_t timeout_ms);  /* <-- ДОБАВИТЬ ЭТУ СТРОКУ */
+uint8_t		FPGA_Is_Ready(void);
+uint8_t		FPGA_Is_In_Reset(void);
+
 /* General convenience macros */
 #define PIN_ON(pin)          PIN_Set(pin)
 #define PIN_OFF(pin)         PIN_Reset(pin)

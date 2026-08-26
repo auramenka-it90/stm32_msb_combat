@@ -75,7 +75,7 @@ SIGNALS_BEGIN(DSPA_SIGNALS_NAME)
 		/* --- DIAGNOSTICS & TELEMETRY SUBTREE --- */
 		_STRING_R_	("Diagnostics", sDEBUG, &sDEV),
 			_FLOAT_R_("adc voltage [V]",        adc_voltage, &sDEBUG),
-			_FLOAT_R_("core temperature [degC]",cpu_temperature, &sDEBUG),
+			_FLOAT_R_("core temperature [°C]",  cpu_temperature, &sDEBUG),
 			_U32_RW_ ("fcs task counter",       fcs_task_counter, &sDEBUG),
 			_U32_R_  ("host tx count",          host_stats.tx_count, &sDEBUG),
 			_U32_R_  ("host rx count",          host_stats.rx_count, &sDEBUG),

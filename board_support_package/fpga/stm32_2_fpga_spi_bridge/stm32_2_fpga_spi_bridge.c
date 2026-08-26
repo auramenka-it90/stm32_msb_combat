@@ -16,7 +16,6 @@
 #define FPGA_CS_LOW(h)   PIN_Reset_F((h)->nss_pin) /* Drives PB0 LOW  (Active)   */
 #define FPGA_CS_HIGH(h)  PIN_Set_F((h)->nss_pin)   /* Drives PB0 HIGH (Inactive) */
 
-
 /* ========================================================================= */
 /*  PUBLIC API IMPLEMENTATION                                                */
 /* ========================================================================= */
@@ -52,10 +51,34 @@ FPGA_Status_t	FPGA_Bridge_Init(FPGA_HandleTypeDef *hbridge, SPI_HandleTypeDef *h
 }
 
 //-----------------------------------------------------------------------------
+// Deinitializes SPI bridge and deletes RTOS mutex
+//-----------------------------------------------------------------------------
+FPGA_Status_t	FPGA_Bridge_DeInit(FPGA_HandleTypeDef *hbridge){
+	if(!hbridge){
+		return FPGA_ERROR;
+	}
+
+	if(hbridge->mutex_id != NULL){
+		osMutexDelete(hbridge->mutex_id);
+		hbridge->mutex_id = NULL;
+	}
+
+	hbridge->hspi    = NULL;
+	hbridge->nss_pin = NULL;
+
+	return FPGA_OK;
+}
+
+//-----------------------------------------------------------------------------
 // Synchronous 16-bit Write: Word 1 = Cmd(MSB=1)+Addr, Word 2 = Data
 //-----------------------------------------------------------------------------
 FPGA_Status_t	FPGA_Write_Poll(FPGA_HandleTypeDef *hbridge, uint16_t addr, uint16_t data, uint32_t timeout_ms){
 	HAL_StatusTypeDef hal_status;
+
+	// Defensive entrance validation
+	if(!hbridge || !hbridge->hspi || !hbridge->nss_pin || !hbridge->mutex_id){
+		return FPGA_ERROR;
+	}
 
 	if(osMutexAcquire(hbridge->mutex_id, timeout_ms) != osOK){
 		return FPGA_BUSY;
@@ -88,7 +111,8 @@ FPGA_Status_t	FPGA_Write_Poll(FPGA_HandleTypeDef *hbridge, uint16_t addr, uint16
 FPGA_Status_t	FPGA_Read_Poll(FPGA_HandleTypeDef *hbridge, uint16_t addr, uint16_t *data, uint32_t timeout_ms){
 	HAL_StatusTypeDef hal_status;
 
-	if(!data){
+	// Defensive entrance validation
+	if(!hbridge || !hbridge->hspi || !hbridge->nss_pin || !hbridge->mutex_id || !data){
 		return FPGA_ERROR;
 	}
 

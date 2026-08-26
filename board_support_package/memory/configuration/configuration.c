@@ -52,22 +52,23 @@ bool	get_dev_cfg(void){
 		memset(&dev_cfg, 0, sizeof(t_memory_cfg));
 
 		/* Factory Passport & Defaults */
-		dev_cfg.item.header          = CFG_HEADER;
-		dev_cfg.item.serial          = CFG_BOARD_SERIAL_NUMBER;
+		dev_cfg.item.header = CFG_HEADER;
+		dev_cfg.item.serial = CFG_BOARD_SERIAL_NUMBER;
 		strncpy(dev_cfg.item.str, CFG_STR, sizeof(dev_cfg.item.str) - 1);
 		dev_cfg.item.str[sizeof(dev_cfg.item.str) - 1] = '\0';
 
-		dev_cfg.item.uart_mux        = false;  /* Default: RS-485 Port 1 (DD19) */
-		dev_cfg.item.latch_period_ms = 10;     /* Default: 10 ms (100 Hz rate) */
-		dev_cfg.item.fcs_inv_1       = 0x0000; /* Default: No input inversions */
-		dev_cfg.item.fcs_inv_2       = 0x00;
+		dev_cfg.item.uart_mux = false; /* Default: RS-485 Port 1 (DD19) */
+		dev_cfg.item.latch_period_ms = 10; /* Default: 10 ms (100 Hz rate) */
+		dev_cfg.item.fcs_inv_1 = 0xFFE0U;/* Default: Invert Active-Low signals 16..26 (CC..RST_FILTR) */
+		dev_cfg.item.fcs_inv_2 = 0x0FU; /* Default: Invert Active-Low signals 27..30 (UR..SCF_ON_ADD) */
 
 		/* Calculate checksum and save to Flash */
 		dev_cfg.u16[CFG_SIZE / 2 - 1] = calc_sum(dev_cfg.u16, CFG_SIZE / 2 - 1);
 
 		result = eeprom_memory_erase(CFG_SECTOR);
 		result &= __eeprom_memory_write(dev_cfg.u8, CFG_START_ADDRESS);
-		eeprom_memory_read(dev_cfg.u8, (uint8_t*)CFG_START_ADDRESS, CFG_SIZE);
+
+		/*eeprom_memory_read(dev_cfg.u8, (uint8_t*)CFG_START_ADDRESS, CFG_SIZE);*/
 	}
 
 	dev_cfg_ready = result;

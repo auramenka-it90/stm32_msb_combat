@@ -2,8 +2,9 @@
 /**
   ******************************************************************************
   * File Name          : freertos.c
-  * Description        : Code for FreeRTOS applications (MainAppl)
-  *                      Strictly aligned with Bootloader synchronization architecture.
+  * Description        : Code for FreeRTOS applications (combat).
+  *                      Optimized Task Stacks, Diagnostics, and Deterministic Timing.
+  *                      All comments in ASCII English.
   ******************************************************************************
   * @attention
   *
@@ -26,9 +27,9 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include "board_support_package.h"  /* Safe central registry include */
-#include "pin_mgmt.h"               /* Safe Pin access include */
-#include "terminal.h"               /* Safe Terminal control include */
+#include "board_support_package.h"
+#include "pin_mgmt.h"
+#include "terminal.h"
 #include "fpga_control.h"
 #include "fcs.h"
 /* USER CODE END Includes */
@@ -51,7 +52,6 @@
 
 /* Private variables ---------------------------------------------------------*/
 /* USER CODE BEGIN Variables */
-/* Extern declarations to access analog values from board_support_package.c */
 extern float cpu_temperature;
 extern float adc_voltage;
 uint32_t fcs_task_counter = 0;
@@ -62,25 +62,25 @@ extern FPGA_HandleTypeDef hfpga_bridge;
 /* Definitions for defaultTask */
 osThreadId_t defaultTaskHandle;
 const osThreadAttr_t defaultTask_attributes = {
-  .name = "defaultTask",
-  .stack_size = 1024 * 4,
-  .priority = (osPriority_t) osPriorityAboveNormal,
+  .name       = "defaultTask",
+  .stack_size = 1024 * 4,                        /* 4 KB stack for FCS real-time control */
+  .priority   = (osPriority_t) osPriorityAboveNormal,
 };
 
 /* Definitions for TerminalTask */
 osThreadId_t TerminalTaskHandle;
 const osThreadAttr_t TerminalTask_attributes = {
-  .name = "TerminalTask",
-  .stack_size = 1024 * 4,
-  .priority = (osPriority_t) osPriorityNormal,
+  .name       = "TerminalTask",
+  .stack_size = 1024 * 4,                        /* 4 KB stack for DSPA packet processing */
+  .priority   = (osPriority_t) osPriorityNormal,
 };
 
-/* Definitions for TemperatureTask */
+/* Definitions for TemperatureTask (Optimized Stack: 1 KB is plenty) */
 osThreadId_t TemperatureTaskHandle;
 const osThreadAttr_t TemperatureTask_attributes = {
-  .name = "TemperatureTask",
-  .stack_size = 1024 * 4,
-  .priority = (osPriority_t) osPriorityLow,
+  .name       = "TemperatureTask",
+  .stack_size = 1024 * 1,                        /* Optimized to 1 KB (Saves 3 KB RAM) */
+  .priority   = (osPriority_t) osPriorityLow,
 };
 
 /* Private function prototypes -----------------------------------------------*/
@@ -121,13 +121,8 @@ void MX_FREERTOS_Init(void) {
   /* USER CODE END RTOS_QUEUES */
 
   /* Create the thread(s) */
-  /* creation of defaultTask */
-  defaultTaskHandle = osThreadNew(StartDefaultTask, NULL, &defaultTask_attributes);
-
-  /* creation of TerminalTask */
-  TerminalTaskHandle = osThreadNew(StartTerminalTask, NULL, &TerminalTask_attributes);
-
-  /* creation of TemperatureTask */
+  defaultTaskHandle     = osThreadNew(StartDefaultTask, NULL, &defaultTask_attributes);
+  TerminalTaskHandle    = osThreadNew(StartTerminalTask, NULL, &TerminalTask_attributes);
   TemperatureTaskHandle = osThreadNew(StartTemperatureTask, NULL, &TemperatureTask_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
@@ -153,7 +148,7 @@ void StartDefaultTask(void *argument)
 	/* 1. Run board-level POST and hardware initialization */
 	init_hardware();
 
-	/* 2. Cascade start tasks based on POST diagnostic results using Thread Flags */
+	/* 2. Cascade start background tasks based on diagnostic results */
 	if (test_status_hardware(_B_FAULT_TERMINAL_)) {
 		osThreadFlagsSet(TerminalTaskHandle, TASK_START_FLAG);
 	}
@@ -166,15 +161,18 @@ void StartDefaultTask(void *argument)
 	if (get_status_hardware() == _B_TEST_HARDWARE_SUCCESS_) {
 		/* All hardware tests passed: Enter main FCS real-time loop */
 		for (;;) {
-			fcs_task();              /* 10 ms periodic FCS execution */
+			fcs_task();              /* 20 ms periodic FCS execution (50 Hz) */
 			++fcs_task_counter;
 			PIN_Toggle_F(&pin_tp1);   /* Fast Test Point 1 heartbeat toggle */
 		}
 	} else {
-		/* Hardware fault detected: Blink FPGA Red LED at 1 Hz indefinitely */
+		/* Hardware fault detected: Blink FPGA Red LED and on-board Green LED */
 		for (;;) {
+			PIN_Set_F(&pin_led_green);
 			FPGA_Debug_Write_LEDs(&hfpga_bridge, ON, OFF, OFF, 10);
 			osDelay(500);
+
+			PIN_Reset_F(&pin_led_green);
 			FPGA_Debug_Write_LEDs(&hfpga_bridge, OFF, OFF, OFF, 10);
 			osDelay(500);
 		}
@@ -192,7 +190,7 @@ void StartDefaultTask(void *argument)
 void StartTerminalTask(void *argument)
 {
   /* USER CODE BEGIN StartTerminalTask */
-	/* Wait for authorization flag from defaultTask. Task sleeps with 0 CPU load. */
+	/* Wait for authorization flag from defaultTask. Sleeps with 0% CPU load. */
 	osThreadFlagsWait(TASK_START_FLAG, osFlagsWaitAny, osWaitForever);
 
 	/* Infinite loop */
@@ -212,14 +210,18 @@ void StartTerminalTask(void *argument)
 void StartTemperatureTask(void *argument)
 {
   /* USER CODE BEGIN StartTemperatureTask */
-	/* Wait for authorization flag from defaultTask. Task sleeps with 0 CPU load. */
-	osThreadFlagsWait(TASK_START_FLAG, osFlagsWaitAny, osWaitForever);
+	static uint32_t last_wake_time = 0;
 
-	/* Infinite loop */
+	/* Wait for authorization flag from defaultTask */
+	osThreadFlagsWait(TASK_START_FLAG, osFlagsWaitAny, osWaitForever);
+	last_wake_time = osKernelGetTickCount();
+
+	/* Infinite loop (Deterministic 100 ms rate) */
 	for (;;) {
-		/* Read CPU internal core temperature every 100 ms */
 		cpu_temperature = Read_Temperature();
-		osDelay(100);
+
+		last_wake_time += (100U * osKernelGetTickFreq()) / 1000U;
+		osDelayUntil(last_wake_time);
 	}
   /* USER CODE END StartTemperatureTask */
 }

@@ -3,7 +3,7 @@
  * @file    stm32_2_fpga_spi_bridge.h
  * @brief   Header for STM32 to FPGA High-Speed SPI Bridge Module.
  *          Provides synchronous 16-bit register access (Polling mode).
- *          All comments in English.
+ *          All comments in ASCII English.
  ******************************************************************************
  */
 
@@ -37,6 +37,7 @@ typedef struct {
 
 /* APIs */
 FPGA_Status_t	FPGA_Bridge_Init(FPGA_HandleTypeDef *hbridge, SPI_HandleTypeDef *hspi, const Pin_Descriptor_t *nss_pin);
+FPGA_Status_t	FPGA_Bridge_DeInit(FPGA_HandleTypeDef *hbridge);
 FPGA_Status_t	FPGA_Write_Poll(FPGA_HandleTypeDef *hbridge, uint16_t addr, uint16_t data, uint32_t timeout_ms);
 FPGA_Status_t	FPGA_Read_Poll(FPGA_HandleTypeDef *hbridge, uint16_t addr, uint16_t *data, uint32_t timeout_ms);
 
