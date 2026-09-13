@@ -28,7 +28,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "board_support_package.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -73,6 +73,10 @@ int main(void)
 
   /* USER CODE BEGIN 1 */
 
+#if (APPLICATION_USE_BOOTLOADER == 1)
+		SCB->VTOR = 0x08020000U;
+		__enable_irq();
+#endif
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
