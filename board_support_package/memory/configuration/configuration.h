@@ -20,8 +20,8 @@ extern "C" {
 /*  FLASH MEMORY SETTINGS (Sector 4: 0x08010000 - 64 KB)                     */
 /* ========================================================================= */
 
-#define CFG_ADDRESS         0x08010000U
-#define CFG_SECTOR          FLASH_SECTOR_4
+#define CFG_ADDRESS         0x08060000U
+#define CFG_SECTOR          FLASH_SECTOR_7
 #define CFG_START_ADDRESS   CFG_ADDRESS
 
 #define CFG_PAGE_SIZE       1024U

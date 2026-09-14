@@ -58,29 +58,26 @@ uint32_t fcs_task_counter = 0;
 
 extern FPGA_HandleTypeDef hfpga_bridge;
 /* USER CODE END Variables */
-
 /* Definitions for defaultTask */
 osThreadId_t defaultTaskHandle;
 const osThreadAttr_t defaultTask_attributes = {
-  .name       = "defaultTask",
-  .stack_size = 1024 * 4,                        /* 4 KB stack for FCS real-time control */
-  .priority   = (osPriority_t) osPriorityAboveNormal,
+  .name = "defaultTask",
+  .stack_size = 1024 * 4,
+  .priority = (osPriority_t) osPriorityAboveNormal,
 };
-
 /* Definitions for TerminalTask */
 osThreadId_t TerminalTaskHandle;
 const osThreadAttr_t TerminalTask_attributes = {
-  .name       = "TerminalTask",
-  .stack_size = 1024 * 4,                        /* 4 KB stack for DSPA packet processing */
-  .priority   = (osPriority_t) osPriorityNormal,
+  .name = "TerminalTask",
+  .stack_size = 1024 * 4,
+  .priority = (osPriority_t) osPriorityNormal,
 };
-
-/* Definitions for TemperatureTask (Optimized Stack: 1 KB is plenty) */
+/* Definitions for TemperatureTask */
 osThreadId_t TemperatureTaskHandle;
 const osThreadAttr_t TemperatureTask_attributes = {
-  .name       = "TemperatureTask",
-  .stack_size = 1024 * 1,                        /* Optimized to 1 KB (Saves 3 KB RAM) */
-  .priority   = (osPriority_t) osPriorityLow,
+  .name = "TemperatureTask",
+  .stack_size = 1024 * 4,
+  .priority = (osPriority_t) osPriorityLow,
 };
 
 /* Private function prototypes -----------------------------------------------*/
@@ -121,8 +118,13 @@ void MX_FREERTOS_Init(void) {
   /* USER CODE END RTOS_QUEUES */
 
   /* Create the thread(s) */
-  defaultTaskHandle     = osThreadNew(StartDefaultTask, NULL, &defaultTask_attributes);
-  TerminalTaskHandle    = osThreadNew(StartTerminalTask, NULL, &TerminalTask_attributes);
+  /* creation of defaultTask */
+  defaultTaskHandle = osThreadNew(StartDefaultTask, NULL, &defaultTask_attributes);
+
+  /* creation of TerminalTask */
+  TerminalTaskHandle = osThreadNew(StartTerminalTask, NULL, &TerminalTask_attributes);
+
+  /* creation of TemperatureTask */
   TemperatureTaskHandle = osThreadNew(StartTemperatureTask, NULL, &TemperatureTask_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
@@ -132,6 +134,7 @@ void MX_FREERTOS_Init(void) {
   /* USER CODE BEGIN RTOS_EVENTS */
   /* add events, ... */
   /* USER CODE END RTOS_EVENTS */
+
 }
 
 /* USER CODE BEGIN Header_StartDefaultTask */
@@ -161,6 +164,15 @@ void StartDefaultTask(void *argument)
 	if (get_status_hardware() == _B_TEST_HARDWARE_SUCCESS_) {
 		/* All hardware tests passed: Enter main FCS real-time loop */
 		for (;;) {
+			/* ========================================================= */
+			/* ТЕСТОВЫЙ ИМПУЛЬС 10 мкс ДЛЯ ОСЦИЛЛОГРАФА НА TP2 (PC1)     */
+			/* ========================================================= */
+			/*
+			PIN_Set_F(&pin_tp2);  TP2 -> HIGH (1)
+			delay_us(10);  Ровно 10 микросекунд через DWT
+			PIN_Reset_F(&pin_tp2);  TP2 -> LOW (0)
+			 */
+
 			fcs_task();              /* 20 ms periodic FCS execution (50 Hz) */
 			++fcs_task_counter;
 			PIN_Toggle_F(&pin_tp1);   /* Fast Test Point 1 heartbeat toggle */
@@ -230,3 +242,4 @@ void StartTemperatureTask(void *argument)
 /* USER CODE BEGIN Application */
 
 /* USER CODE END Application */
+

@@ -16,8 +16,9 @@ extern	uint32_t	test_hardware_result;
 
 
 //	ADC
-extern	float adc_voltage;
+extern	float 	adc_voltage;
 extern	float	cpu_temperature;
+extern  float 	real_vref;
 
 //	FCS counter
 extern 	uint32_t fcs_task_counter;

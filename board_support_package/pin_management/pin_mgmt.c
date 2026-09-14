@@ -12,7 +12,7 @@
 /* Global Pin Management Configuration */
 Pin_Mgmt_Config_t bsp_pin_config = PIN_MGMT_CONFIG_DEFAULT;
 
-static uint8_t      spi_bus_acquired = 0;
+static uint8_t      spi_bus_acquired;
 static osMutexId_t  gpio_mutex       = NULL;
 
 /* ========================================================================= */
@@ -167,7 +167,7 @@ osStatus_t	PIN_MGMT_Init(Pin_Mgmt_Config_t *config){
 	if(config != NULL){
 		bsp_pin_config = *config;
 	}
-	spi_bus_acquired = 0;
+	spi_bus_acquired  = 1;	/* !!!! 1 обязательно */
 	return _create_gpio_mutex();
 }
 

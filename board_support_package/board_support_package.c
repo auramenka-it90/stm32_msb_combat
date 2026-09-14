@@ -26,13 +26,29 @@ Pin_Mgmt_Config_t pin = {
     .debug_enabled = 1
 };
 
-/* Global Analog Telemetry */
+/* ========================================================================= */
+/*       ADC INTERNAL TEMPERATURE SENSOR DEFINITIONS & CONSTANTS             */
+/* ========================================================================= */
+#define ADC_MAX_VALUE_12BIT      4095.0f
+
+/* Параметры датчика из Datasheet STM32F411 */
+#define TEMP_SENSOR_V25          0.76f     /* Напряжение датчика при 25 °C (В) */
+#define TEMP_SENSOR_AVG_SLOPE    0.0025f   /* Чувствительность: 2.5 мВ / °C (В/°C) */
+#define TEMP_SENSOR_REF_TEMP     25.0f     /* Опорная температура для V25 (°C) */
+
+#define TEMP_ERROR_VALUE         (-999.0f) /* Значение при аппаратной ошибке АЦП */
+#define TEMP_FILTER_MAX_SAMPLES  32U       /* Максимальный размер буфера усреднения */
+
+/* Адрес калибровки VREFINT (снято на заводе при 3.3 В, 30 °C) */
+#ifndef VREFINT_CAL_ADDR
+#define VREFINT_CAL_ADDR         ((uint16_t*)0x1FFF7A2A)
+#endif
+#define VREFINT_CAL_VOLTAGE      3.3f      /* Опорное напряжение заводской калибровки */
+
+/* Глобальные переменные (для совместимости с твоим кодом) */
 float adc_voltage = 0.0f;
 float cpu_temperature = 0.0f;
-
-/* Factory Calibration Register Addresses for STM32F411 */
-#define TS_CAL1_ADDR     ((volatile uint16_t*)0x1FFF7A2CU)
-#define TS_CAL2_ADDR     ((volatile uint16_t*)0x1FFF7A30U)
+float real_vref= 0.0f;
 
 /* ========================================================================= */
 /*  SYSTEM HARDWARE INITIALIZATION & POST                                    */
@@ -57,7 +73,7 @@ uint32_t	init_hardware(void){
 		SPI_Bus_Release_To_FPGA();
 
 		// 4. Pulse PROG_B (PB15) and wait for DONE = 1 (PA1) with 500ms timeout
-		if(FPGA_Reset_With_Check(10, 500) != osOK){
+		if(FPGA_Reset_With_Check(10, 1500) != osOK){
 			test_hardware_result |= _B_FAULT_FPGA_;
 		} else {
 
@@ -126,8 +142,17 @@ bool	get_rcc_csr(void){
 }
 
 // System reset wrapper
-void	bsp_system_reset(void){
+/*void	bsp_system_reset(void){
 	HAL_NVIC_SystemReset();
+}*/
+void	bsp_system_reset(void){
+	__disable_irq();
+	__DSB();
+	__ISB();
+	NVIC_SystemReset();
+	while(1){
+		__NOP();
+	}
 }
 
 // RS-485 Transmitter Enable wrapper with atomic 2us stabilization delay
@@ -141,56 +166,126 @@ void	ten(bool par){
 }
 
 /* ========================================================================= */
-/*  ANALOG MEASUREMENTS (ADC INTERNAL TEMPERATURE)                           */
+/*                         ФУНКЦИИ ЧТЕНИЯ                                    */
 /* ========================================================================= */
 
-// Fast internal CPU temperature calculation (8-sample hardware averaging)
-static float	Read_Temperature_Enhanced(void){
-	uint32_t adc_value = 0;
-	float temp = 0.0f;
+/**
+ * @brief  Чтение температуры кристалла с опциональным усреднением
+ * @param  filter_enable: 1 - включить скользящее среднее, 0 - без фильтрации
+ * @param  filter_samples: количество выборок для усреднения (1..32)
+ * @retval Температура в градусах Цельсия или TEMP_ERROR_VALUE при сбое
+ */
+float Read_Temperature_Enhanced(uint8_t filter_enable, uint8_t filter_samples){
+    uint32_t vref_raw = 0;
+    uint32_t temp_raw = 0;
+    float current_temp;
 
-	// Wake up internal temperature sensor and Vrefint channels
-	if((ADC->CCR & ADC_CCR_TSVREFE) == 0){
-		ADC->CCR |= ADC_CCR_TSVREFE;
-		delay_us(20);
-	}
+    /* Буфер и переменные для скользящего среднего */
+    static float filter_buffer[TEMP_FILTER_MAX_SAMPLES] = {0};
+    static uint8_t filter_idx = 0;
+    static uint8_t filter_count = 0;
 
-	// Take average of 8 consecutive conversions for noise suppression
-	for(int i = 0; i < 8; i++){
-		HAL_ADC_Start(&hadc1);
-		if(HAL_ADC_PollForConversion(&hadc1, 4) == HAL_OK){
-			adc_value += HAL_ADC_GetValue(&hadc1);
-		}
-		HAL_ADC_Stop(&hadc1);
-	}
-	adc_value /= 8;
+    /* Ограничение параметров фильтра */
+    if (filter_samples < 1U) filter_samples = 1U;
+    if (filter_samples > TEMP_FILTER_MAX_SAMPLES) filter_samples = TEMP_FILTER_MAX_SAMPLES;
 
-	// Factory calibration registers
-	uint16_t ts_cal1 = *TS_CAL1_ADDR;
-	uint16_t ts_cal2 = *TS_CAL2_ADDR;
+    /* ---------------------------------------------------------------------
+     * 1. Запуск секвенсора: последовательно считываем Rank 1 и Rank 2
+     * --------------------------------------------------------------------- */
+    if (HAL_ADC_Start(&hadc1) != HAL_OK) {
+        cpu_temperature = TEMP_ERROR_VALUE;
+        return cpu_temperature;
+    }
 
-	if(ts_cal2 > ts_cal1 && ts_cal1 != 0xFFFF && ts_cal2 != 0xFFFF){
-		temp = ((110.0f - 30.0f) / (float)(ts_cal2 - ts_cal1)) * (float)((int32_t)adc_value - ts_cal1) + 30.0f;
-	} else {
-		adc_voltage = (float)adc_value * 3.3f / 4095.0f;
-		temp = 25.0f + ((adc_voltage - 0.76f) / 0.0025f);
-	}
-	return temp;
+    /* Ожидание и чтение Rank 1 (VREFINT) */
+    if (HAL_ADC_PollForConversion(&hadc1, 5) != HAL_OK) {
+        HAL_ADC_Stop(&hadc1);
+        cpu_temperature = TEMP_ERROR_VALUE;
+        return cpu_temperature;
+    }
+    vref_raw = HAL_ADC_GetValue(&hadc1);
+
+    /* Ожидание и чтение Rank 2 (TEMPSENSOR) */
+    if (HAL_ADC_PollForConversion(&hadc1, 5) != HAL_OK) {
+        HAL_ADC_Stop(&hadc1);
+        cpu_temperature = TEMP_ERROR_VALUE;
+        return cpu_temperature;
+    }
+    temp_raw = HAL_ADC_GetValue(&hadc1);
+
+    /* Останавливаем АЦП после завершения цепочки */
+    HAL_ADC_Stop(&hadc1);
+
+    /* Защита от деления на ноль */
+    if (vref_raw == 0) {
+        cpu_temperature = TEMP_ERROR_VALUE;
+        return cpu_temperature;
+    }
+
+    /* ---------------------------------------------------------------------
+     * 2. Расчет реального напряжения питания VDDA (VREF+)
+     *    Формула: VDDA = 3.3V * VREFINT_CAL / VREFINT_DATA
+     * --------------------------------------------------------------------- */
+    real_vref = ((float)(*VREFINT_CAL_ADDR) * VREFINT_CAL_VOLTAGE) / (float)vref_raw;
+
+    /* ---------------------------------------------------------------------
+     * 3. Перевод сырых отсчетов датчика в Вольты с учетом реального VDDA
+     * --------------------------------------------------------------------- */
+    adc_voltage = ((float)temp_raw * real_vref) / ADC_MAX_VALUE_12BIT;
+
+    /* ---------------------------------------------------------------------
+     * 4. Расчет температуры по Datasheet STM32F411
+     *    T = ((Vsense - V25) / Slope) + 25.0
+     * --------------------------------------------------------------------- */
+    current_temp = ((adc_voltage - TEMP_SENSOR_V25) / TEMP_SENSOR_AVG_SLOPE) + TEMP_SENSOR_REF_TEMP;
+
+    /* ---------------------------------------------------------------------
+     * 5. Фильтр скользящего среднего
+     * --------------------------------------------------------------------- */
+    if (filter_enable && (filter_samples > 1U)) {
+        filter_buffer[filter_idx] = current_temp;
+        filter_idx = (filter_idx + 1U) % filter_samples;
+
+        if (filter_count < filter_samples) {
+            filter_count++;
+        }
+
+        float sum = 0.0f;
+        for (uint8_t i = 0; i < filter_count; i++) {
+            sum += filter_buffer[i];
+        }
+        cpu_temperature = sum / (float)filter_count;
+    } else {
+        cpu_temperature = current_temp;
+    }
+
+    return cpu_temperature;
 }
 
-// Public wrapper (exactly like Bootloader)
-float	Read_Temperature(void){
-	return Read_Temperature_Enhanced();
+/**
+ * @brief  Базовая функция-обертка
+ * @retval Температура с усреднением по 8 сэмплам (800 мс при вызове раз в 100 мс)
+ */
+float Read_Temperature(void) {
+	return Read_Temperature_Enhanced(1, 8);
 }
 
 /* ========================================================================= */
 /*  DWT MICROSECOND DELAY GENERATOR                                          */
 /* ========================================================================= */
 
+/*
 void	DWT_Init(void){
 	volatile uint32_t *dwt_lar = (volatile uint32_t *)0xE0001FB0U;
 	*dwt_lar = 0xC5ACCE55U;
 
+	CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
+	DWT->CYCCNT = 0;
+	DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;
+}
+*/
+
+void	DWT_Init(void){
 	CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
 	DWT->CYCCNT = 0;
 	DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;

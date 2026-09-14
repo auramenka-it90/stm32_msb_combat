@@ -34,7 +34,7 @@ SIGNALS_BEGIN(DSPA_SIGNALS_NAME)
 		_U32_R_	("Test hardware (0=OK)", test_hardware_result, &sDEV),
 
 		/* --- CONFIGURATION & PASSPORT SUBTREE --- */
-		_STRING_R_	("Config (Sector 4)", sCFG, &sDEV),
+		_STRING_R_	("Config (Sector 7)", sCFG, &sDEV),
 			_U64_R_ ("Serial number",           dev_cfg.item.serial, &sCFG),
 			_BOOL_RW_("RS-485 MUX (0=P1, 1=P2)",dev_cfg.item.uart_mux, &sCFG),
 			_BYTE_RW_("Latch period [ms]",      dev_cfg.item.latch_period_ms, &sCFG),
