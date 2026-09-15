@@ -142,16 +142,18 @@ typedef struct __attribute__((packed)) {
 /*  PUBLIC API PROTOTYPES                                                    */
 /* ========================================================================= */
 
-bool				host_uart_init(UART_HandleTypeDef *huart);
-void				host_uart_start_receive(void);
-bool				host_uart_send_raw(const uint8_t *data, uint16_t len);
-UART_HandleTypeDef*	host_uart_get_handle(void);
-void				host_send_msb_packet(const FCS_State_t *state);
+bool host_uart_init(UART_HandleTypeDef *huart);
+void host_uart_start_receive(void);
+bool host_uart_send_raw(const uint8_t *data, uint16_t len);
+UART_HandleTypeDef* host_uart_get_handle(void);
+void host_send_msb_packet(const FCS_State_t *state);
 
 /* Interrupt Handlers */
-void				host_uart_rx_event_handler(UART_HandleTypeDef *huart, uint16_t Size);
-void				host_uart_tx_complete_handler(UART_HandleTypeDef *huart);
-void				host_uart_error_handler(UART_HandleTypeDef *huart);
+void host_uart_rx_event_handler(UART_HandleTypeDef *huart, uint16_t Size);
+void host_uart_tx_complete_handler(UART_HandleTypeDef *huart);
+void host_uart_error_handler(UART_HandleTypeDef *huart);
+
+void host_uart_set_de(bool enable);
 
 #ifdef __cplusplus
 }

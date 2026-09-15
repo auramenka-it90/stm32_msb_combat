@@ -52,7 +52,6 @@ const Pin_Descriptor_t pin_fpga_2_stm32_misc1 = PIN_DESC(FPGA_2_STM32_MISC1_GPIO
 const Pin_Descriptor_t pin_stm32_2_fpga_nss_d = PIN_DESC(STM32_2_FPGA_NSS_D_GPIO_Port, STM32_2_FPGA_NSS_D_Pin, 1, "STM32_NSS_D");
 const Pin_Descriptor_t pin_interrupt_fpga      = PIN_DESC(INTERRUPT_FPGA_GPIO_Port, INTERRUPT_FPGA_Pin, 0, "INTERRUPT_FPGA");
 
-const Pin_Descriptor_t pin_mr_fpga   = PIN_DESC(MR_FPGA_GPIO_Port, MR_FPGA_Pin, 0, "MR_FPGA");
 /* PB15: PROG_B (Default 0: FPGA held in reset until explicit bring-up) */
 const Pin_Descriptor_t pin_mr_prog   = PIN_DESC(MR_PROG_GPIO_Port, MR_PROG_Pin, 0, "MR_PROG");
 
@@ -67,6 +66,9 @@ const Pin_Descriptor_t pin_usart1_kpa_rx = PIN_DESC(USART1_KPA_RX_GPIO_Port, USA
 
 /* ST-Link Hardware Detection Pin */
 const Pin_Descriptor_t pin_stlink_detect = PIN_DESC(STLINK_GND_TEST_GPIO_Port, STLINK_GND_TEST_Pin, 1, "STLINK_DETECT");
+
+
+const Pin_Descriptor_t pin_usart2_fpga_de = PIN_DESC(USART2_FPGA_DE_GPIO_Port, USART2_FPGA_DE_Pin, 0, "USART2_DE");
 
 /* ========================================================================= */
 /*  PRIVATE FUNCTIONS                                                        */

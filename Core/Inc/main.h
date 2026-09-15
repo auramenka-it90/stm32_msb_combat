@@ -91,8 +91,8 @@ void Error_Handler(void);
 #define STM32_2_FPGA_NSS_D_GPIO_Port GPIOB
 #define INTERRUPT_FPGA_Pin GPIO_PIN_10
 #define INTERRUPT_FPGA_GPIO_Port GPIOB
-#define MR_FPGA_Pin GPIO_PIN_13
-#define MR_FPGA_GPIO_Port GPIOB
+#define USART2_FPGA_DE_Pin GPIO_PIN_13
+#define USART2_FPGA_DE_GPIO_Port GPIOB
 #define MR_PROG_Pin GPIO_PIN_15
 #define MR_PROG_GPIO_Port GPIOB
 #define USART6_DEBUG_TX_Pin GPIO_PIN_6

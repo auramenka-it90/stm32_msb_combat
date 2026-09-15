@@ -57,7 +57,7 @@ void MX_GPIO_Init(void)
   HAL_GPIO_WritePin(GPIOB, STM32_2_FPGA_NSS_P_Pin|STM32_2_FPGA_NSS_D_Pin, GPIO_PIN_SET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(MR_PROG_GPIO_Port, MR_PROG_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOB, USART2_FPGA_DE_Pin|MR_PROG_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(USART1_KPA_TE_GPIO_Port, USART1_KPA_TE_Pin, GPIO_PIN_RESET);
@@ -88,8 +88,8 @@ void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
   HAL_GPIO_Init(STM32_2_FPGA_NSS_P_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : FPGA_2_STM32_MISC1_Pin MR_FPGA_Pin STLINK_GND_TEST_Pin */
-  GPIO_InitStruct.Pin = FPGA_2_STM32_MISC1_Pin|MR_FPGA_Pin|STLINK_GND_TEST_Pin;
+  /*Configure GPIO pins : FPGA_2_STM32_MISC1_Pin STLINK_GND_TEST_Pin */
+  GPIO_InitStruct.Pin = FPGA_2_STM32_MISC1_Pin|STLINK_GND_TEST_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
   GPIO_InitStruct.Pull = GPIO_PULLUP;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
@@ -106,6 +106,13 @@ void MX_GPIO_Init(void)
   GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(INTERRUPT_FPGA_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : USART2_FPGA_DE_Pin */
+  GPIO_InitStruct.Pin = USART2_FPGA_DE_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
+  HAL_GPIO_Init(USART2_FPGA_DE_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pin : USART1_KPA_TE_Pin */
   GPIO_InitStruct.Pin = USART1_KPA_TE_Pin;

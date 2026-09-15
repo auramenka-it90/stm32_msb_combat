@@ -18,6 +18,12 @@ static char *sCFG    = "";
 static char *sFCSIN  = "";
 static char *sFCSOUT = "";
 static char *sDEBUG  = "";
+static char *sTP     = ""; /* Подсекция Test Points внутри Diagnostics */
+
+/* Testpoint multiplexer channel selectors (0..31) */
+uint8_t tp5_mux_sel = 0;   /* TP5 (P81): 0=100Hz, 1=50MHz, 2=1kHz, 5=NSS, 6=WR, 7=RD, 8=TX, 9=RX... */
+uint8_t tp6_mux_sel = 0;   /* TP6 (P80): 0=1kHz,  1=50MHz, 2=1kHz, 5=NSS, 6=WR, 7=RD, 8=TX, 9=RX... */
+uint8_t tp7_mux_sel = 0;   /* TP7 (P79): 0=Reset, 1=50MHz, 2=1kHz, 4=IRQ, 5=NSS, 8=TX, 9=RX... */
 
 /* 32-bit selection mask: 0 = Hardware Pin, 1 = Software Override */
 uint32_t terminal_override_mask = 0x00000000U;
@@ -81,6 +87,11 @@ SIGNALS_BEGIN(DSPA_SIGNALS_NAME)
 			_U32_R_  ("host rx count",          host_stats.rx_count, &sDEBUG),
 			_U32_R_  ("host rx crc err",        host_stats.rx_crc_err, &sDEBUG),
 			_U32_R_  ("host rx xor err",        host_stats.rx_xor_err, &sDEBUG),
+			/* --- Подсекция внутри Diagnostics --- */
+			_STRING_R_	("Test points (TP5-TP7)", sTP, &sDEBUG),
+				_BYTE_RW_("TP5 sel (P81)",      tp5_mux_sel, &sTP),
+				_BYTE_RW_("TP6 sel (P80)",      tp6_mux_sel, &sTP),
+				_BYTE_RW_("TP7 sel (P79)",      tp7_mux_sel, &sTP),
 SIGNALS_END(DSPA_SIGNALS_NAME)
 
 /* ========================================================================= */
@@ -124,5 +135,15 @@ void	signal_change_handler(void *s){
 	if((s == &dev_cfg.item.fcs_inv_1) || (s == &dev_cfg.item.fcs_inv_2)){
 		dev_cfg.item.fcs_inv_2 &= 0x0FU; // Для сигналов 27..30 валидны только биты 0..3
 		FPGA_FCS_Configure_Inversions(&hfpga_bridge, dev_cfg.item.fcs_inv_1, dev_cfg.item.fcs_inv_2, 100);
+	}
+
+
+	// 5. Dynamic Testpoint Multiplexer routing (TP5, TP6, TP7)
+	if((s == &tp5_mux_sel) || (s == &tp6_mux_sel) || (s == &tp7_mux_sel)){
+		if(tp5_mux_sel > 31) tp5_mux_sel = 31;
+		if(tp6_mux_sel > 31) tp6_mux_sel = 31;
+		if(tp7_mux_sel > 31) tp7_mux_sel = 31;
+
+		FPGA_Debug_Set_TP_Mux(&hfpga_bridge, tp5_mux_sel, tp6_mux_sel, tp7_mux_sel, 100);
 	}
 }

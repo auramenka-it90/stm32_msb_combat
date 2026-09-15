@@ -134,6 +134,8 @@ extern const Pin_Descriptor_t pin_usart1_kpa_tx;
 extern const Pin_Descriptor_t pin_usart1_kpa_rx;
 extern const Pin_Descriptor_t pin_stlink_detect;
 
+extern const Pin_Descriptor_t pin_usart2_fpga_de;
+
 #ifdef __cplusplus
 }
 #endif

@@ -171,6 +171,8 @@ bool	host_uart_init(UART_HandleTypeDef *huart){
 	if(!huart) return false;
 	host_ctx.huart = huart;
 
+	host_uart_set_de(false); /* По умолчанию слушаем линию (DE = 0) */
+
 	host_ctx.tx_mutex = osMutexNew(NULL);
 	host_ctx.tx_sem   = osSemaphoreNew(1, 1, NULL);
 
@@ -205,7 +207,11 @@ bool	host_uart_send_raw(const uint8_t *data, uint16_t len){
 
 	memcpy(host_tx_buf, data, len);
 
+	/* 1. Включаем передатчик RS-485 */
+	host_uart_set_de(true);
+
 	if(HAL_UART_Transmit_DMA(host_ctx.huart, host_tx_buf, len) != HAL_OK){
+		host_uart_set_de(false); /* Сброс при ошибке */
 		osSemaphoreRelease(host_ctx.tx_sem);
 		osMutexRelease(host_ctx.tx_mutex);
 		return false;
@@ -227,6 +233,8 @@ UART_HandleTypeDef*	host_uart_get_handle(void){
 //-----------------------------------------------------------------------------
 void	host_uart_tx_complete_handler(UART_HandleTypeDef *huart){
 	if(huart == host_ctx.huart){
+		/* Передача завершена: мгновенно переходим на прием */
+		host_uart_set_de(false);
 		osSemaphoreRelease(host_ctx.tx_sem);
 	}
 }
@@ -339,5 +347,18 @@ void	host_send_msb_packet(const FCS_State_t *state){
 void	HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size){
 	if(huart->Instance == USART2){
 		host_uart_rx_event_handler(huart, Size);
+	}
+}
+
+
+//-----------------------------------------------------------------------------
+// RS-485 Direction Control for BC Channel (via PB13 -> Spartan-6 P35)
+//-----------------------------------------------------------------------------
+void host_uart_set_de(bool enable){
+	if(enable){
+		PIN_Set_F(&pin_usart2_fpga_de); // PB13 -> 1 (Передача)
+		delay_us(2);                   // Стабилизация трансивера MAX3485
+	} else {
+		PIN_Reset_F(&pin_usart2_fpga_de); // PB13 -> 0 (Прием)
 	}
 }
