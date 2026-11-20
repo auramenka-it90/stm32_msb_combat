@@ -46,6 +46,7 @@ typedef struct {
     uint32_t rx_count;      // Total successfully received packets (BC -> MSB)
     uint32_t rx_crc_err;    // Total packets discarded due to CRC mismatch
     uint32_t rx_xor_err;    // Total packets discarded due to XOR mismatch
+    uint32_t rx_drop;       // Bytes dropped by ISR: RX ring full (task consumer stalled)
 } Host_Stats_t;
 
 /* Global statistics and connection trackers */
@@ -64,7 +65,7 @@ typedef union {
     uint8_t raw;
     struct __attribute__((packed)) {
         uint8_t cc      : 1;   // bit 0: Double command override
-        uint8_t dc      : 1;   // bit 1: Target designation (ЦУ)
+        uint8_t dc      : 1;   // bit 1: Target designation (TSU)
         uint8_t srd     : 1;   // bit 2: Set/Reset Distance status (JK latch output)
         uint8_t bc_en   : 1;   // bit 3: Ballistic Computer enable
         uint8_t rl      : 1;   // bit 4: Rocket Launch completed
@@ -114,8 +115,8 @@ typedef union {
         uint8_t uoi               : 1;   // bit 3: UOI signal active
         uint8_t inhibit_shooting  : 1;   // bit 4: Shooting inhibited
         uint8_t wind_sensor_on    : 1;   // bit 5: Wind sensor turned on
-        uint8_t rfu4              : 1;   // bit 6: Reserved
-        uint8_t rfu5              : 1;   // bit 7: Reserved
+        uint8_t bc_on             : 1;   // bit 6: BC operating (BC_ON discrete)
+        uint8_t bc_ready          : 1;   // bit 7: BC ready (BC_READY discrete)
     } bits;
 } BC_Flags_t;
 
@@ -153,7 +154,14 @@ void host_uart_rx_event_handler(UART_HandleTypeDef *huart, uint16_t Size);
 void host_uart_tx_complete_handler(UART_HandleTypeDef *huart);
 void host_uart_error_handler(UART_HandleTypeDef *huart);
 
-void host_uart_set_de(bool enable);
+/* Task-context RX drain: parses bytes queued by the UART ISR (call from fcs_task) */
+void host_process_rx_pending(void);
+
+/* Event wait: blocks until ISR queues RX bytes or timeout (OS ticks) expires */
+osStatus_t host_rx_wait(uint32_t timeout_ticks);
+
+/* Re-arms one-shot DMA reception if it was lost (call from task periodically) */
+void host_rx_guard(void);
 
 #ifdef __cplusplus
 }

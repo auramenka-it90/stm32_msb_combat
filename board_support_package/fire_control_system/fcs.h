@@ -34,11 +34,11 @@ extern "C" {
  */
 typedef enum {
     FCS_AMMO_NONE = 0x0, // No ammunition / undetermined
-    FCS_AMMO_APDS = 0x1, // APDS - Armor-Piercing Discarding Sabot (Б)
-    FCS_AMMO_HEAT = 0x2, // HEAT - High-Explosive Anti-Tank (К)
-    FCS_AMMO_HEF  = 0x3, // HEF  - High-Explosive Fragmentation (О)
-    FCS_AMMO_MG   = 0x4, // MG   - Machine Gun (П)
-    FCS_AMMO_GM   = 0x5  // GM   - Guided Missile (У)
+    FCS_AMMO_APDS = 0x1, // APDS - Armor-Piercing Discarding Sabot (mark 'B')
+    FCS_AMMO_HEAT = 0x2, // HEAT - High-Explosive Anti-Tank (mark 'K')
+    FCS_AMMO_HEF  = 0x3, // HEF  - High-Explosive Fragmentation (mark 'O')
+    FCS_AMMO_MG   = 0x4, // MG   - Machine Gun (mark 'P')
+    FCS_AMMO_GM   = 0x5  // GM   - Guided Missile (mark 'U')
 } FCS_AmmoType_t;
 
 /**
@@ -49,8 +49,8 @@ typedef struct {
     FCS_AmmoType_t  ammo_type;         // Active ammunition type (0..5)
 
     /* Flags Part 1 (Byte 3) */
-    bool            cc;                // CC - Co-commander override (Дубль)
-    bool            dc;                // DC - Target designation command (ЦУ)
+    bool            cc;                // CC - Co-commander override (DUBL)
+    bool            dc;                // DC - Target designation command (TSU)
     bool            srd;               // SRD - Set/Reset Distance latch status (JK output)
     bool            bc_en;             // BC_EN - Ballistic Computer enable
     bool            rl;                // RL - Rocket Launch completed
@@ -81,6 +81,8 @@ typedef struct {
     bool            uoi;               // UOI - UOI signal active
     bool            inhibit_shooting;  // INHIBIT_SHOOTING - Shoot command blocked
     bool            wind_sensor_on;    // WIND_SENSOR_ON - Wind sensor activated
+    bool            bc_on;             // BC_ON - BC operating (discrete output, FPGA P22)
+    bool            bc_ready;          // BC_READY - BC ready (discrete output, FPGA P23)
 } FCS_Control_Commands_t;
 
 /* Global state and command handles */

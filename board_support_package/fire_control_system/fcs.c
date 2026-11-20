@@ -10,6 +10,7 @@
 #include "fcs.h"
 #include "fpga_control.h"
 #include "configuration.h"
+#include "board_support_package.h"
 #include "host.h"
 #include "cmsis_os.h"
 
@@ -108,37 +109,62 @@ void	fcs_set_sensors(void){
 	if(fcs_commands.ena_shooting)    ctrl_val |= FPGA_FCS_CONTROL_ENA_SHOOTING;
 	if(fcs_commands.gmee)            ctrl_val |= FPGA_FCS_CONTROL_GMEE;
 	if(fcs_commands.range_over_1280) ctrl_val |= FPGA_FCS_CONTROL_RANGE_1280;
-	if(fcs_commands.uoi)              ctrl_val |= FPGA_FCS_CONTROL_UOI;
+	if(fcs_commands.uoi)             ctrl_val |= FPGA_FCS_CONTROL_UOI;
 	if(fcs_commands.inhibit_shooting)ctrl_val |= FPGA_FCS_CONTROL_INHIBIT_SHOOT;
 	if(fcs_commands.wind_sensor_on)  ctrl_val |= FPGA_FCS_CONTROL_WIND_SENS_ON;
+	if(fcs_commands.bc_on)           ctrl_val |= FPGA_FCS_CONTROL_BC_ON;
+	if(fcs_commands.bc_ready)        ctrl_val |= FPGA_FCS_CONTROL_BC_READY;
 
 	FPGA_FCS_Set_Control_Outputs(&hfpga_bridge, ctrl_val, 100);
 }
 
 //-----------------------------------------------------------------------------
-// High-level periodic FCS task execution loop (20 ms / 50 Hz rate)
+// High-level FCS task: event-driven BC reaction + 20 ms periodic section.
+// The RX semaphore doubles as the period delay: an inbound BC packet wakes
+// the task within microseconds (command goes to FPGA immediately), while
+// the periodic part stays locked to the exact 50 Hz deadline.
 //-----------------------------------------------------------------------------
 void	fcs_task(void){
-	static uint32_t last_wake_time = 0;
+	static uint32_t next_wake_time = 0U;
 	static bool     is_initialized = false;
+	const uint32_t  period_ticks = (FCS_TICK_MS * osKernelGetTickFreq()) / 1000U;
+	uint32_t        now;
+	int32_t         remaining;
 
 	if(!is_initialized){
-		last_wake_time = osKernelGetTickCount();
+		next_wake_time = osKernelGetTickCount() + period_ticks;
 		is_initialized = true;
 	}
 
-	/* 1. Fetch 100Hz-latched inputs from FPGA (SPI) */
-	fcs_get_sensors();
+	/* 1. Wait for BC bytes (event) or until the next 50 Hz deadline */
+	now = osKernelGetTickCount();
+	remaining = (int32_t)(next_wake_time - now);
+	host_rx_wait((remaining > 0) ? (uint32_t)remaining : 0U);
 
-	/* 2. Send 32-byte packet to Ballistic Computer (UART2 DMA, Non-Blocking) */
-	host_send_msb_packet(&fcs_state);
+	/* 2. Apply freshly arrived BC commands right now (SPI write) */
+	host_process_rx_pending();
 
-	/* 3. Output current commands to FPGA outputs (SPI) */
-	fcs_set_sensors();
+	/* 3. Periodic section: strict 50 Hz */
+	now = osKernelGetTickCount();
+	if((int32_t)(now - next_wake_time) >= 0){
+		/* 3a. Fetch 100Hz-latched inputs from FPGA (SPI) */
+		fcs_get_sensors();
 
-	/* 4. Maintain exact periodic rate of 20 ms */
-	last_wake_time += (FCS_TICK_MS * osKernelGetTickFreq()) / 1000U;
-	osDelayUntil(last_wake_time);
+		/* 3b. Send 32-byte packet to Ballistic Computer (UART2 DMA, Non-Blocking) */
+		host_send_msb_packet(&fcs_state);
+
+		/* 3c. Output current commands to FPGA outputs (SPI watchdog heartbeat) */
+		fcs_set_sensors();
+
+		/* 3d. Make sure one-shot DMA reception is armed */
+		host_rx_guard();
+
+		/* 3e. Advance deadline; resync on overrun instead of burst-catching */
+		next_wake_time += period_ticks;
+		if((int32_t)(osKernelGetTickCount() - next_wake_time) >= 0){
+			next_wake_time = osKernelGetTickCount() + period_ticks;
+		}
+	}
 }
 
 //-----------------------------------------------------------------------------
@@ -169,14 +195,18 @@ void	fcs_init_fpga_hardware(void){
 	status = FPGA_FCS_Set_Latch_Enable(&hfpga_bridge, true, 100);
 	if(status != FPGA_OK) goto init_error;
 
-	// 6. Clear any stale pending interrupts in FPGA
+	// 6. Arm control-output watchdog (FPGA clears outputs on link loss)
+	status = FPGA_FCS_Set_Watchdog(&hfpga_bridge, FPGA_FCS_WD_STARTUP_MS, 100);
+	if(status != FPGA_OK) goto init_error;
+
+	// 7. Clear any stale pending interrupts in FPGA
 	uint16_t pending_irqs = 0;
 	status = FPGA_Int_Get_Pending(&hfpga_bridge, &pending_irqs, 100);
 	if(status == FPGA_OK && pending_irqs != 0){
 		FPGA_Int_Clear_Pending(&hfpga_bridge, pending_irqs, 100);
 	}
 
-	// 7. Disable FPGA Interrupts (Polling task architecture is used)
+	// 8. Disable FPGA Interrupts (Polling task architecture is used)
 	status = FPGA_Int_Configure(&hfpga_bridge, 0x0000, 0x0000, false, 100);
 	if(status != FPGA_OK) goto init_error;
 

@@ -42,18 +42,14 @@ extern "C" {
 #define REG_S_DEBUG_CONST_OFF        0x01U // [RO] Alive check validation constant (0xDEAD)
 #define REG_S_DEBUG_MISC_OFF         0x02U // [RW] System misc control (LEDs, UART MUX, Timer Div)
 #define REG_S_DEBUG_TP_MUX_OFF       0x03U // [RW] Dynamic Testpoint Multiplexer routing
-#define REG_S_DEBUG_RECONFIG_OFF     0x04U // [WO] MultiBoot IPROG Reconfiguration Trigger
 
 #define ADDR_S_DEBUG_FEEDBACK        FPGA_S_ADDR(FPGA_S_DEV_DEBUG_ID, REG_S_DEBUG_FEEDBACK_OFF)
 #define ADDR_S_DEBUG_CONST           FPGA_S_ADDR(FPGA_S_DEV_DEBUG_ID, REG_S_DEBUG_CONST_OFF)
 #define ADDR_S_DEBUG_MISC            FPGA_S_ADDR(FPGA_S_DEV_DEBUG_ID, REG_S_DEBUG_MISC_OFF)
 #define ADDR_S_DEBUG_TP_MUX          FPGA_S_ADDR(FPGA_S_DEV_DEBUG_ID, REG_S_DEBUG_TP_MUX_OFF)
-#define ADDR_S_DEBUG_RECONFIG        FPGA_S_ADDR(FPGA_S_DEV_DEBUG_ID, REG_S_DEBUG_RECONFIG_OFF)
 
 #define FPGA_DEBUG_CONST_VAL         0xDEADU // Validation constant from Verilog
 #define FPGA_DEBUG_ECHO_TEST_VAL     0x55AAU // SPI Bus Integrity Checkerboard Test Pattern
-#define FPGA_DEBUG_RECONFIG_KEY      0xAA55U // Magic key to trigger internal IPROG reboot
-#define FPGA_RECONFIG_MAGIC_KEY      FPGA_DEBUG_RECONFIG_KEY
 
 /**
  * REG_S_DEBUG_MISC (0x02) Bit Definitions:
@@ -92,6 +88,24 @@ extern "C" {
  * Bits [9:5]   : Signal selector for TP6 (Physical Pin 80)
  * Bits [14:10] : Signal selector for TP7 (Physical Pin 79)
  * Bit  15      : Reserved
+ *
+ * Signal selector index -> msb_main.v tp_signals[] (authoritative table):
+ *   0  = GND (logic 0)          16 = de2               32 = (reserved)
+ *   1  = clk/2 (DCM alive)      17 = tx3
+ *   2  = tick_1khz              18 = rx3               Clock/reset health: 1..4
+ *   3  = tick_out_pulse (100Hz) 19 = de3               SPI bus: 5..10
+ *   4  = rst                    20 = uart_mux_sel      IRQ line: 11
+ *   5  = spi_stm32_sck          21 = fcs_ctrl[0] ENA   UART/RS-485: 12..20
+ *   6  = spi_stm32_mosi         22 = fcs_ctrl[1] GMEE  Discrete orders: 21..28
+ *   7  = miso_poll (internal)   23 = fcs_ctrl[2] RNG   (raw pre-inversion)
+ *   8  = spi_stm32_nss_p        24 = fcs_ctrl[3] UOI   Watchdog flag: 29
+ *   9  = spi_wr_strobe          25 = fcs_ctrl[4] INH   Key discretes: 30..31
+ *   10 = spi_rd_active          26 = fcs_ctrl[5] WIND
+ *   11 = fpga_2_stm32_irq_N     27 = fcs_ctrl[6] BC_ON   FPGA reset defaults:
+ *   12 = usart2_fpga_tx         28 = fcs_ctrl[7] BC_RDY   TP5=3(100Hz),
+ *   13 = usart2_fpga_rx         29 = wd_expired          TP6=2(1kHz),
+ *   14 = tx2                    30 = BTN_CANNON (raw)    TP7=4(rst)
+ *   15 = rx2                    31 = BC_EN (raw)
  */
 #define FPGA_TP_MUX_TP5_SHIFT        0U
 #define FPGA_TP_MUX_TP5_MASK         (0x1FU << FPGA_TP_MUX_TP5_SHIFT)
@@ -107,17 +121,21 @@ extern "C" {
 
 #define REG_S_FCS_STATUS_1_OFF       0x00U // [RO] Lower 16 clean inputs (DR[10:0] + HEF..GM)
 #define REG_S_FCS_STATUS_2_OFF       0x01U // [RO] Upper 15 clean inputs (CC..SCF_ON_ADD) + JK at MSB
-#define REG_S_FCS_HARD_SOFT_1_OFF    0x10U // [WO] Hard/Soft override for inputs [15:0]
-#define REG_S_FCS_HARD_SOFT_2_OFF    0x11U // [WO] Hard/Soft override for inputs [30:16]
-#define REG_S_FCS_SOFT_VAL_1_OFF     0x12U // [WO] Software virtual values for inputs [15:0]
-#define REG_S_FCS_SOFT_VAL_2_OFF     0x13U // [WO] Software virtual values for inputs [30:16]
-#define REG_S_FCS_INV_1_OFF          0x14U // [WO] Inversion mask for physical inputs [26:11] (Def: 0xFFE0)
-#define REG_S_FCS_INV_2_OFF          0x15U // [WO] Inversion mask for physical inputs [30:27] (Def: 0x0F)
-#define REG_S_FCS_CONTROL_OFF        0x16U // [WO] 8 Discrete Control Outputs
-#define REG_S_FCS_LATCH_EN_OFF       0x17U // [WO] Latch enable: 0 = Bypass, 1 = Sample-and-Hold
+#define REG_S_FCS_CONST_OFF          0x02U // [RO] FCS alive signature (0x55AA), per-device presence check
+#define REG_S_FCS_WD_TIMEOUT_OFF     0x03U // [RW] Control-output watchdog timeout in ms, 0 = disabled (Def: 0)
+#define REG_S_FCS_HARD_SOFT_1_OFF    0x10U // [RW] Hard/Soft override for inputs [15:0] (readable back)
+#define REG_S_FCS_HARD_SOFT_2_OFF    0x11U // [RW] Hard/Soft override for inputs [30:16] (readable back)
+#define REG_S_FCS_SOFT_VAL_1_OFF     0x12U // [RW] Software virtual values for inputs [15:0] (readable back)
+#define REG_S_FCS_SOFT_VAL_2_OFF     0x13U // [RW] Software virtual values for inputs [30:16] (readable back)
+#define REG_S_FCS_INV_1_OFF          0x14U // [RW] Inversion mask for physical inputs [26:11] (Def: 0xFFE0, readable back)
+#define REG_S_FCS_INV_2_OFF          0x15U // [RW] Inversion mask for physical inputs [30:27] (Def: 0x0F, readable back)
+#define REG_S_FCS_CONTROL_OFF        0x16U // [RW] 8 Discrete Control Outputs (readable back)
+#define REG_S_FCS_LATCH_EN_OFF       0x17U // [RW] Latch enable: 0 = Bypass, 1 = Sample-and-Hold (readable back)
 
 #define ADDR_S_FCS_STATUS_1          FPGA_S_ADDR(FPGA_S_DEV_FCS_ID, REG_S_FCS_STATUS_1_OFF)
 #define ADDR_S_FCS_STATUS_2          FPGA_S_ADDR(FPGA_S_DEV_FCS_ID, REG_S_FCS_STATUS_2_OFF)
+#define ADDR_S_FCS_CONST             FPGA_S_ADDR(FPGA_S_DEV_FCS_ID, REG_S_FCS_CONST_OFF)
+#define ADDR_S_FCS_WD_TIMEOUT        FPGA_S_ADDR(FPGA_S_DEV_FCS_ID, REG_S_FCS_WD_TIMEOUT_OFF)
 #define ADDR_S_FCS_HARD_SOFT_1       FPGA_S_ADDR(FPGA_S_DEV_FCS_ID, REG_S_FCS_HARD_SOFT_1_OFF)
 #define ADDR_S_FCS_HARD_SOFT_2       FPGA_S_ADDR(FPGA_S_DEV_FCS_ID, REG_S_FCS_HARD_SOFT_2_OFF)
 #define ADDR_S_FCS_SOFT_VAL_1        FPGA_S_ADDR(FPGA_S_DEV_FCS_ID, REG_S_FCS_SOFT_VAL_1_OFF)
@@ -126,6 +144,8 @@ extern "C" {
 #define ADDR_S_FCS_INV_2             FPGA_S_ADDR(FPGA_S_DEV_FCS_ID, REG_S_FCS_INV_2_OFF)
 #define ADDR_S_FCS_CONTROL           FPGA_S_ADDR(FPGA_S_DEV_FCS_ID, REG_S_FCS_CONTROL_OFF)
 #define ADDR_S_FCS_LATCH_EN          FPGA_S_ADDR(FPGA_S_DEV_FCS_ID, REG_S_FCS_LATCH_EN_OFF)
+
+#define FPGA_FCS_CONST_VAL           0x55AAU // FCS module alive signature from Verilog
 
 /**
  * REG_S_FCS_STATUS_1 Bit Masks (Inputs [15:0])
@@ -178,8 +198,11 @@ extern "C" {
 #define FPGA_FCS_CONTROL_WIND_SENSOR_ON   FPGA_FCS_CONTROL_WIND_SENS_ON
 #define FPGA_FCS_CONTROL_WIND_SENS        FPGA_FCS_CONTROL_WIND_SENS_ON
 
-#define FPGA_FCS_CONTROL_RFU4             0x40U // Bit 6: Reserved Output 4
-#define FPGA_FCS_CONTROL_RFU5             0x80U // Bit 7: Reserved Output 5
+#define FPGA_FCS_CONTROL_RFU4             0x40U // Bit 6: BC_ON Output (FPGA msb_main.v, pin P22)
+#define FPGA_FCS_CONTROL_BC_ON            FPGA_FCS_CONTROL_RFU4
+
+#define FPGA_FCS_CONTROL_RFU5             0x80U // Bit 7: BC_READY Output (FPGA msb_main.v, pin P23)
+#define FPGA_FCS_CONTROL_BC_READY         FPGA_FCS_CONTROL_RFU5
 
 /* ========================================================================= */
 /*  4. MODULE 3: INTERRUPT CONTROLLER (ID = 3)                               */
@@ -190,11 +213,15 @@ extern "C" {
 #define REG_S_INT_MASK_OFF           0x01U // [RW] Mask (1 = Enabled, 0 = Disabled)
 #define REG_S_INT_EDGE_SEL_OFF       0x02U // [RW] Edge Select (0 = Rising, 1 = Falling)
 #define REG_S_INT_CTRL_OFF           0x03U // [RW] Global Control (Bit 0 = Global Enable)
+#define REG_S_INT_PENDING_RAW_OFF    0x04U // [RO] RAW pending flags, unmasked (audit/debug)
+#define REG_S_INT_LEVELS_OFF         0x05U // [RO] Settled IRQ input levels (post synchronizer)
 
 #define ADDR_S_INT_PENDING           FPGA_S_ADDR(FPGA_S_DEV_INT_CTRL_ID, REG_S_INT_PENDING_OFF)
 #define ADDR_S_INT_MASK              FPGA_S_ADDR(FPGA_S_DEV_INT_CTRL_ID, REG_S_INT_MASK_OFF)
 #define ADDR_S_INT_EDGE_SEL          FPGA_S_ADDR(FPGA_S_DEV_INT_CTRL_ID, REG_S_INT_EDGE_SEL_OFF)
 #define ADDR_S_INT_CTRL              FPGA_S_ADDR(FPGA_S_DEV_INT_CTRL_ID, REG_S_INT_CTRL_OFF)
+#define ADDR_S_INT_PENDING_RAW       FPGA_S_ADDR(FPGA_S_DEV_INT_CTRL_ID, REG_S_INT_PENDING_RAW_OFF)
+#define ADDR_S_INT_LEVELS            FPGA_S_ADDR(FPGA_S_DEV_INT_CTRL_ID, REG_S_INT_LEVELS_OFF)
 
 #define FPGA_INT_CTRL_GIE_ENABLE     0x0001U // Bit 0: Global Interrupt Enable
 

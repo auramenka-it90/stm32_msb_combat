@@ -196,14 +196,6 @@ extern "C" {
 #define STLINK_GND_TEST_GPIO_Port   GPIOB
 #endif
 
-/* USART2 FPGA Driver Enable (PB13 -> Spartan-6 P35) */
-#ifndef USART2_FPGA_DE_Pin
-#define USART2_FPGA_DE_Pin          GPIO_PIN_13
-#endif
-#ifndef USART2_FPGA_DE_GPIO_Port
-#define USART2_FPGA_DE_GPIO_Port    GPIOB
-#endif
-
 
 #ifdef __cplusplus
 }

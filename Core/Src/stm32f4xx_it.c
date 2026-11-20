@@ -67,7 +67,7 @@ extern UART_HandleTypeDef huart6;
 extern TIM_HandleTypeDef htim10;
 
 /* USER CODE BEGIN EV */
-
+extern TIM_HandleTypeDef htim10;
 /* USER CODE END EV */
 
 /******************************************************************************/

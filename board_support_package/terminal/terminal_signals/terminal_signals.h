@@ -15,10 +15,7 @@
 extern	uint32_t	test_hardware_result;
 
 
-//	ADC
-extern	float 	adc_voltage;
-extern	float	cpu_temperature;
-extern  float 	real_vref;
+//	ADC externs moved to board_support_package.h (definitions live in board_support_package.c)
 
 //	FCS counter
 extern 	uint32_t fcs_task_counter;

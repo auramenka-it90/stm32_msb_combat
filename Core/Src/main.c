@@ -49,7 +49,26 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
+#if (APPLICATION_USE_BOOTLOADER == 1)
+/* Firmware passport: consumed by patch_crc.py (PC side) and by
+ * check_application() in msb_bootloader. Placed by the linker script
+ * STM32F411RETX_FLASH_BL.ld into section .fw_header, right after the
+ * vector table. fw_size/crc32 are placeholders (0xFFFFFFFF) in the
+ * compiled image, overwritten by the patcher */
+typedef struct {
+	uint32_t magic;   /* 0x55AA55AA - search signature */
+	uint32_t version; /* firmware version, patcher expects 1 */
+	uint32_t fw_size; /* total padded image size, filled by patch_crc.py */
+	uint32_t crc32;   /* CRC32 (STM32 hardware algorithm) of payload */
+} fw_header_t;
 
+__attribute__((section(".fw_header"), used)) volatile const fw_header_t fw_header = {
+		.magic   = 0x55AA55AA,
+		.version = 1,
+		.fw_size = 0xFFFFFFFF, /* placeholder for patch_crc.py */
+		.crc32   = 0xFFFFFFFF, /* placeholder for patch_crc.py */
+};
+#endif
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/

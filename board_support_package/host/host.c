@@ -29,6 +29,7 @@ typedef struct {
     UART_HandleTypeDef *huart;
     osMutexId_t         tx_mutex;   /* Protects tx_buf from concurrent task access */
     osSemaphoreId_t     tx_sem;     /* Blocks transmitting task until DMA TX finishes */
+    osSemaphoreId_t     rx_sem;     /* Wakes the consumer task when bytes enter the ring */
 } host_uart_context_t;
 
 static host_uart_context_t host_ctx = {0};
@@ -41,6 +42,16 @@ volatile bool      is_bc_link_error     = true;
 /* Static DMA buffers */
 static uint8_t host_rx_buf[HOST_RX_BUF_SIZE];
 static uint8_t host_tx_buf[HOST_TX_BUF_SIZE];
+
+/* Lock-free SPSC byte ring: UART ISR producer -> task consumer.
+   Sized 1024 B = 32 packets: survives ~80 ms of consumer stall at
+   400 Hz inbound traffic. Parsing and FPGA access must never run
+   in ISR context (FreeRTOS restriction) - they happen in the task
+   via host_process_rx_pending(). */
+#define HOST_RX_RING_SIZE  1024U
+static uint8_t             host_rx_ring[HOST_RX_RING_SIZE];
+static volatile uint32_t   host_rx_wr = 0U;   /* moved by ISR only */
+static volatile uint32_t   host_rx_rd = 0U;   /* moved by task only */
 
 /* ========================================================================= */
 /*  PRIVATE PROTOCOL HELPER FUNCTIONS                                        */
@@ -142,6 +153,8 @@ static void	host_process_rx_byte(uint8_t rx_byte){
 					fcs_commands.uoi              = bc_flags.bits.uoi ? true : false;
 					fcs_commands.inhibit_shooting = bc_flags.bits.inhibit_shooting ? true : false;
 					fcs_commands.wind_sensor_on   = bc_flags.bits.wind_sensor_on ? true : false;
+					fcs_commands.bc_on            = bc_flags.bits.bc_on ? true : false;
+					fcs_commands.bc_ready         = bc_flags.bits.bc_ready ? true : false;
 
 					// Immediate asynchronous output write to FPGA
 					fcs_set_sensors();
@@ -171,12 +184,12 @@ bool	host_uart_init(UART_HandleTypeDef *huart){
 	if(!huart) return false;
 	host_ctx.huart = huart;
 
-	host_uart_set_de(false); /* По умолчанию слушаем линию (DE = 0) */
-
 	host_ctx.tx_mutex = osMutexNew(NULL);
 	host_ctx.tx_sem   = osSemaphoreNew(1, 1, NULL);
+	host_ctx.rx_sem   = osSemaphoreNew(1, 0, NULL);
 
-	return (host_ctx.tx_mutex != NULL && host_ctx.tx_sem != NULL);
+	return (host_ctx.tx_mutex != NULL && host_ctx.tx_sem != NULL
+	        && host_ctx.rx_sem != NULL);
 }
 
 //-----------------------------------------------------------------------------
@@ -207,11 +220,7 @@ bool	host_uart_send_raw(const uint8_t *data, uint16_t len){
 
 	memcpy(host_tx_buf, data, len);
 
-	/* 1. Включаем передатчик RS-485 */
-	host_uart_set_de(true);
-
 	if(HAL_UART_Transmit_DMA(host_ctx.huart, host_tx_buf, len) != HAL_OK){
-		host_uart_set_de(false); /* Сброс при ошибке */
 		osSemaphoreRelease(host_ctx.tx_sem);
 		osMutexRelease(host_ctx.tx_mutex);
 		return false;
@@ -233,23 +242,63 @@ UART_HandleTypeDef*	host_uart_get_handle(void){
 //-----------------------------------------------------------------------------
 void	host_uart_tx_complete_handler(UART_HandleTypeDef *huart){
 	if(huart == host_ctx.huart){
-		/* Передача завершена: мгновенно переходим на прием */
-		host_uart_set_de(false);
 		osSemaphoreRelease(host_ctx.tx_sem);
 	}
 }
 
 //-----------------------------------------------------------------------------
-// Processes received bytes from DMA buffer and restarts reception
+// UART ISR body: queue raw bytes into the SPSC ring, re-arm DMA reception.
+// No parsing, no FPGA access, no OS calls here (FreeRTOS ISR rules).
 //-----------------------------------------------------------------------------
 void	host_uart_rx_event_handler(UART_HandleTypeDef *huart, uint16_t Size){
 	if(huart == host_ctx.huart){
-		if(Size > 0){
-			for(uint16_t i = 0; i < Size; i++){
-				host_process_rx_byte(host_rx_buf[i]);
+		for(uint16_t i = 0; i < Size; i++){
+			if((host_rx_wr - host_rx_rd) < HOST_RX_RING_SIZE){
+				host_rx_ring[host_rx_wr & (HOST_RX_RING_SIZE - 1U)] = host_rx_buf[i];
+				host_rx_wr++;
+			} else {
+				host_stats.rx_drop++;   /* consumer stalled >80 ms: byte lost */
 			}
 		}
 		host_uart_start_receive();
+		/* Wake the consumer task immediately (ISR-safe in CMSIS-RTOS2) */
+		osSemaphoreRelease(host_ctx.rx_sem);
+	}
+}
+
+//-----------------------------------------------------------------------------
+// Task-context drain: parses all bytes queued by the UART ISR.
+// Called by fcs_task right after host_rx_wait() returns.
+//-----------------------------------------------------------------------------
+void	host_process_rx_pending(void){
+	while(host_rx_rd != host_rx_wr){
+		uint8_t byte = host_rx_ring[host_rx_rd & (HOST_RX_RING_SIZE - 1U)];
+		host_rx_rd++;
+		host_process_rx_byte(byte);
+	}
+}
+
+//-----------------------------------------------------------------------------
+// Blocks the caller until the UART ISR queues received bytes or the timeout
+// expires. Used by fcs_task as combined event-wait / period-delay primitive.
+//-----------------------------------------------------------------------------
+osStatus_t	host_rx_wait(uint32_t timeout_ticks){
+	if(host_ctx.rx_sem == NULL){
+		return osErrorResource;
+	}
+	return osSemaphoreAcquire(host_ctx.rx_sem, timeout_ticks);
+}
+
+//-----------------------------------------------------------------------------
+// RX guard: re-arms one-shot DMA reception if it was lost (e.g. after an
+// UART error path). Called from fcs_task periodic section (50 Hz).
+//-----------------------------------------------------------------------------
+void	host_rx_guard(void){
+	if(host_ctx.huart == NULL){
+		return;
+	}
+	if(host_ctx.huart->RxState == HAL_UART_STATE_READY){
+		host_uart_start_receive(); /* Idle DMA reception was never armed */
 	}
 }
 
@@ -347,18 +396,5 @@ void	host_send_msb_packet(const FCS_State_t *state){
 void	HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size){
 	if(huart->Instance == USART2){
 		host_uart_rx_event_handler(huart, Size);
-	}
-}
-
-
-//-----------------------------------------------------------------------------
-// RS-485 Direction Control for BC Channel (via PB13 -> Spartan-6 P35)
-//-----------------------------------------------------------------------------
-void host_uart_set_de(bool enable){
-	if(enable){
-		PIN_Set_F(&pin_usart2_fpga_de); // PB13 -> 1 (Передача)
-		delay_us(2);                   // Стабилизация трансивера MAX3485
-	} else {
-		PIN_Reset_F(&pin_usart2_fpga_de); // PB13 -> 0 (Прием)
 	}
 }

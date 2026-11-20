@@ -19,56 +19,55 @@ static osMutexId_t  gpio_mutex       = NULL;
 /*  PIN DESCRIPTORS                                                          */
 /* ========================================================================= */
 
-const Pin_Descriptor_t pin_led_green = PIN_DESC(LED_GREEN_GPIO_Port, LED_GREEN_Pin, 0, "LED_GREEN");
-const Pin_Descriptor_t pin_clk25mhz  = PIN_DESC(CLK25MHZ_GPIO_Port, CLK25MHZ_Pin, 0, "CLK25MHZ");
+const Pin_Descriptor_t pin_led_green = PIN_DESC(LED_GREEN_GPIO_Port, LED_GREEN_Pin, "LED_GREEN");
+/* pin_clk25mhz FORBIDDEN: PH0 is the HSE 25 MHz clock input (RCC_OSC_IN).
+   Repurposing this pin as GPIO kills SYSCLK (PLL source = HSE). Kept commented. */
+// const Pin_Descriptor_t pin_clk25mhz = PIN_DESC(CLK25MHZ_GPIO_Port, CLK25MHZ_Pin, "CLK25MHZ");
 
 /* Test Points for Logic Analyzer / Oscilloscope */
-const Pin_Descriptor_t pin_tp1        = PIN_DESC(TP1_GPIO_Port, TP1_Pin, 0, "TP1");
-const Pin_Descriptor_t pin_tp2        = PIN_DESC(TP2_GPIO_Port, TP2_Pin, 0, "TP2");
-const Pin_Descriptor_t pin_tp3        = PIN_DESC(TP3_GPIO_Port, TP3_Pin, 0, "TP3");
-const Pin_Descriptor_t pin_tp4        = PIN_DESC(TP4_GPIO_Port, TP4_Pin, 0, "TP4");
+const Pin_Descriptor_t pin_tp1        = PIN_DESC(TP1_GPIO_Port, TP1_Pin, "TP1");
+const Pin_Descriptor_t pin_tp2        = PIN_DESC(TP2_GPIO_Port, TP2_Pin, "TP2");
+const Pin_Descriptor_t pin_tp3        = PIN_DESC(TP3_GPIO_Port, TP3_Pin, "TP3");
+const Pin_Descriptor_t pin_tp4        = PIN_DESC(TP4_GPIO_Port, TP4_Pin, "TP4");
 
 /* FPGA Boot Status Pin (PA1) */
-const Pin_Descriptor_t pin_fpga_done  = PIN_DESC(DONE_GPIO_Port, DONE_Pin, 0, "FPGA_DONE");
+const Pin_Descriptor_t pin_fpga_done  = PIN_DESC(DONE_GPIO_Port, DONE_Pin, "FPGA_DONE");
 
 /* UART2: Link to FPGA */
-const Pin_Descriptor_t pin_usart2_fpga_tx = PIN_DESC(USART2_FPGA_TX_GPIO_Port, USART2_FPGA_TX_Pin, 0, "USART2_FPGA_TX");
-const Pin_Descriptor_t pin_usart2_fpga_rx = PIN_DESC(USART2_FPGA_RX_GPIO_Port, USART2_FPGA_RX_Pin, 0, "USART2_FPGA_RX");
+const Pin_Descriptor_t pin_usart2_fpga_tx = PIN_DESC(USART2_FPGA_TX_GPIO_Port, USART2_FPGA_TX_Pin, "USART2_FPGA_TX");
+const Pin_Descriptor_t pin_usart2_fpga_rx = PIN_DESC(USART2_FPGA_RX_GPIO_Port, USART2_FPGA_RX_Pin, "USART2_FPGA_RX");
 
 /* PA4: Flash W25Q128 Chip Select (Default 1, kept as Input in MainAppl) */
-const Pin_Descriptor_t pin_flash_cs = PIN_DESC(SP1_FPGA_CSO_GPIO_Port, SP1_FPGA_CSO_Pin, 1, "FLASH_CS");
-const Pin_Descriptor_t pin_spi_cso  = PIN_DESC(SP1_FPGA_CSO_GPIO_Port, SP1_FPGA_CSO_Pin, 1, "FLASH_CS");
+const Pin_Descriptor_t pin_flash_cs = PIN_DESC(SP1_FPGA_CSO_GPIO_Port, SP1_FPGA_CSO_Pin, "FLASH_CS");
+const Pin_Descriptor_t pin_spi_cso  = PIN_DESC(SP1_FPGA_CSO_GPIO_Port, SP1_FPGA_CSO_Pin, "FLASH_CS");
 
 /* PB0: FPGA Registers Chip Select (Active working CS for MainAppl) */
-const Pin_Descriptor_t pin_fpga_cs            = PIN_DESC(STM32_2_FPGA_NSS_P_GPIO_Port, STM32_2_FPGA_NSS_P_Pin, 1, "FPGA_CS");
-const Pin_Descriptor_t pin_stm32_2_fpga_nss_p = PIN_DESC(STM32_2_FPGA_NSS_P_GPIO_Port, STM32_2_FPGA_NSS_P_Pin, 1, "FPGA_CS");
+const Pin_Descriptor_t pin_fpga_cs            = PIN_DESC(STM32_2_FPGA_NSS_P_GPIO_Port, STM32_2_FPGA_NSS_P_Pin, "FPGA_CS");
+const Pin_Descriptor_t pin_stm32_2_fpga_nss_p = PIN_DESC(STM32_2_FPGA_NSS_P_GPIO_Port, STM32_2_FPGA_NSS_P_Pin, "FPGA_CS");
 
 /* SPI1 Data Bus */
-const Pin_Descriptor_t pin_spi_sck   = PIN_DESC(SP1_FPGA_SCK_GPIO_Port, SP1_FPGA_SCK_Pin, 0, "SPI_SCK");
-const Pin_Descriptor_t pin_spi_miso  = PIN_DESC(SPI1_FPGA_MISO_GPIO_Port, SPI1_FPGA_MISO_Pin, 0, "SPI_MISO");
-const Pin_Descriptor_t pin_spi_mosi  = PIN_DESC(SPI1_FPGA_MOSI_GPIO_Port, SPI1_FPGA_MOSI_Pin, 0, "SPI_MOSI");
+const Pin_Descriptor_t pin_spi_sck   = PIN_DESC(SP1_FPGA_SCK_GPIO_Port, SP1_FPGA_SCK_Pin, "SPI_SCK");
+const Pin_Descriptor_t pin_spi_miso  = PIN_DESC(SPI1_FPGA_MISO_GPIO_Port, SPI1_FPGA_MISO_Pin, "SPI_MISO");
+const Pin_Descriptor_t pin_spi_mosi  = PIN_DESC(SPI1_FPGA_MOSI_GPIO_Port, SPI1_FPGA_MOSI_Pin, "SPI_MOSI");
 
-const Pin_Descriptor_t pin_fpga_2_stm32_misc1 = PIN_DESC(FPGA_2_STM32_MISC1_GPIO_Port, FPGA_2_STM32_MISC1_Pin, 0, "FPGA_MISC1");
-const Pin_Descriptor_t pin_stm32_2_fpga_nss_d = PIN_DESC(STM32_2_FPGA_NSS_D_GPIO_Port, STM32_2_FPGA_NSS_D_Pin, 1, "STM32_NSS_D");
-const Pin_Descriptor_t pin_interrupt_fpga      = PIN_DESC(INTERRUPT_FPGA_GPIO_Port, INTERRUPT_FPGA_Pin, 0, "INTERRUPT_FPGA");
+const Pin_Descriptor_t pin_fpga_2_stm32_misc1 = PIN_DESC(FPGA_2_STM32_MISC1_GPIO_Port, FPGA_2_STM32_MISC1_Pin, "FPGA_MISC1");
+const Pin_Descriptor_t pin_stm32_2_fpga_nss_d = PIN_DESC(STM32_2_FPGA_NSS_D_GPIO_Port, STM32_2_FPGA_NSS_D_Pin, "STM32_NSS_D");
+const Pin_Descriptor_t pin_interrupt_fpga      = PIN_DESC(INTERRUPT_FPGA_GPIO_Port, INTERRUPT_FPGA_Pin, "INTERRUPT_FPGA");
 
 /* PB15: PROG_B (Default 0: FPGA held in reset until explicit bring-up) */
-const Pin_Descriptor_t pin_mr_prog   = PIN_DESC(MR_PROG_GPIO_Port, MR_PROG_Pin, 0, "MR_PROG");
+const Pin_Descriptor_t pin_mr_prog   = PIN_DESC(MR_PROG_GPIO_Port, MR_PROG_Pin, "MR_PROG");
 
 /* UART6: Debug / ST-Link VCP */
-const Pin_Descriptor_t pin_usart6_debug_tx = PIN_DESC(USART6_DEBUG_TX_GPIO_Port, USART6_DEBUG_TX_Pin, 0, "USART6_DEBUG_TX");
-const Pin_Descriptor_t pin_usart6_debug_rx = PIN_DESC(USART6_DEBUG_RX_GPIO_Port, USART6_DEBUG_RX_Pin, 0, "USART6_DEBUG_RX");
+const Pin_Descriptor_t pin_usart6_debug_tx = PIN_DESC(USART6_DEBUG_TX_GPIO_Port, USART6_DEBUG_TX_Pin, "USART6_DEBUG_TX");
+const Pin_Descriptor_t pin_usart6_debug_rx = PIN_DESC(USART6_DEBUG_RX_GPIO_Port, USART6_DEBUG_RX_Pin, "USART6_DEBUG_RX");
 
 /* UART1: KPA / RS-485 */
-const Pin_Descriptor_t pin_usart1_kpa_te = PIN_DESC(USART1_KPA_TE_GPIO_Port, USART1_KPA_TE_Pin, 0, "USART1_KPA_TE");
-const Pin_Descriptor_t pin_usart1_kpa_tx = PIN_DESC(USART1_KPA_TX_GPIO_Port, USART1_KPA_TX_Pin, 0, "USART1_KPA_TX");
-const Pin_Descriptor_t pin_usart1_kpa_rx = PIN_DESC(USART1_KPA_RX_GPIO_Port, USART1_KPA_RX_Pin, 0, "USART1_KPA_RX");
+const Pin_Descriptor_t pin_usart1_kpa_te = PIN_DESC(USART1_KPA_TE_GPIO_Port, USART1_KPA_TE_Pin, "USART1_KPA_TE");
+const Pin_Descriptor_t pin_usart1_kpa_tx = PIN_DESC(USART1_KPA_TX_GPIO_Port, USART1_KPA_TX_Pin, "USART1_KPA_TX");
+const Pin_Descriptor_t pin_usart1_kpa_rx = PIN_DESC(USART1_KPA_RX_GPIO_Port, USART1_KPA_RX_Pin, "USART1_KPA_RX");
 
 /* ST-Link Hardware Detection Pin */
-const Pin_Descriptor_t pin_stlink_detect = PIN_DESC(STLINK_GND_TEST_GPIO_Port, STLINK_GND_TEST_Pin, 1, "STLINK_DETECT");
-
-
-const Pin_Descriptor_t pin_usart2_fpga_de = PIN_DESC(USART2_FPGA_DE_GPIO_Port, USART2_FPGA_DE_Pin, 0, "USART2_DE");
+const Pin_Descriptor_t pin_stlink_detect = PIN_DESC(STLINK_GND_TEST_GPIO_Port, STLINK_GND_TEST_Pin, "STLINK_DETECT");
 
 /* ========================================================================= */
 /*  PRIVATE FUNCTIONS                                                        */
@@ -169,7 +168,7 @@ osStatus_t	PIN_MGMT_Init(Pin_Mgmt_Config_t *config){
 	if(config != NULL){
 		bsp_pin_config = *config;
 	}
-	spi_bus_acquired  = 1;	/* !!!! 1 обязательно */
+	spi_bus_acquired  = 1;	/* !!!! MUST be 1: STM32 owns the SPI bus after init */
 	return _create_gpio_mutex();
 }
 
@@ -182,96 +181,51 @@ osStatus_t	PIN_MGMT_DeInit(void){
 }
 
 //-----------------------------------------------------------------------------
-// Standard mutex-protected pin set
+// Atomic pin set via BSRR (hardware-atomic, ISR-callable, no mutex needed)
 //-----------------------------------------------------------------------------
 osStatus_t	PIN_Set(const Pin_Descriptor_t *pin){
-	if(!pin || !pin->port) return osErrorParameter;
-	osStatus_t status = PIN_GPIO_Mutex_Acquire(osWaitForever);
-	if(status != osOK) return status;
-
-	HAL_GPIO_WritePin(pin->port, pin->pin, GPIO_PIN_SET);
-	PIN_GPIO_Mutex_Release();
-	return osOK;
-}
-
-//-----------------------------------------------------------------------------
-// Standard mutex-protected pin reset
-//-----------------------------------------------------------------------------
-osStatus_t	PIN_Reset(const Pin_Descriptor_t *pin){
-	if(!pin || !pin->port) return osErrorParameter;
-	osStatus_t status = PIN_GPIO_Mutex_Acquire(osWaitForever);
-	if(status != osOK) return status;
-
-	HAL_GPIO_WritePin(pin->port, pin->pin, GPIO_PIN_RESET);
-	PIN_GPIO_Mutex_Release();
-	return osOK;
-}
-
-//-----------------------------------------------------------------------------
-// Standard mutex-protected pin toggle
-//-----------------------------------------------------------------------------
-osStatus_t	PIN_Toggle(const Pin_Descriptor_t *pin){
-	if(!pin || !pin->port) return osErrorParameter;
-	osStatus_t status = PIN_GPIO_Mutex_Acquire(osWaitForever);
-	if(status != osOK) return status;
-
-	HAL_GPIO_TogglePin(pin->port, pin->pin);
-	PIN_GPIO_Mutex_Release();
-	return osOK;
-}
-
-//-----------------------------------------------------------------------------
-// Standard mutex-protected pin read
-//-----------------------------------------------------------------------------
-uint8_t		PIN_Read(const Pin_Descriptor_t *pin){
-	if(!pin || !pin->port) return 0;
-	uint8_t state = 0;
-	if(PIN_GPIO_Mutex_Acquire(osWaitForever) == osOK){
-		state = (HAL_GPIO_ReadPin(pin->port, pin->pin) == GPIO_PIN_SET) ? 1 : 0;
-		PIN_GPIO_Mutex_Release();
-	}
-	return state;
-}
-
-//-----------------------------------------------------------------------------
-// Fast atomic pin set via BSRR register (No mutex overhead)
-//-----------------------------------------------------------------------------
-osStatus_t	PIN_Set_F(const Pin_Descriptor_t *pin){
 	if(!pin || !pin->port) return osErrorParameter;
 	pin->port->BSRR = pin->pin;
 	return osOK;
 }
 
 //-----------------------------------------------------------------------------
-// Fast atomic pin reset via upper BSRR register (No mutex overhead)
+// Atomic pin reset via upper BSRR half (hardware-atomic, ISR-callable)
 //-----------------------------------------------------------------------------
-osStatus_t	PIN_Reset_F(const Pin_Descriptor_t *pin){
+osStatus_t	PIN_Reset(const Pin_Descriptor_t *pin){
 	if(!pin || !pin->port) return osErrorParameter;
 	pin->port->BSRR = (uint32_t)pin->pin << 16U;
 	return osOK;
 }
 
 //-----------------------------------------------------------------------------
-// Fast atomic pin toggle via BSRR (Prevents RMW race condition on shared ports)
+// Atomic toggle via BSRR (prevents RMW corruption of adjacent pins)
 //-----------------------------------------------------------------------------
-osStatus_t	PIN_Toggle_F(const Pin_Descriptor_t *pin){
+osStatus_t	PIN_Toggle(const Pin_Descriptor_t *pin){
 	if(!pin || !pin->port) return osErrorParameter;
-	uint32_t odr = pin->port->ODR;
-	if(odr & pin->pin){
+	if(pin->port->ODR & pin->pin){
 		pin->port->BSRR = (uint32_t)pin->pin << 16U;
-	} else {
+	}else{
 		pin->port->BSRR = pin->pin;
 	}
 	return osOK;
 }
 
 //-----------------------------------------------------------------------------
-// Fast direct non-blocking IDR register read
+// Direct non-blocking IDR read
 //-----------------------------------------------------------------------------
-uint8_t		PIN_Read_F(const Pin_Descriptor_t *pin){
+uint8_t		PIN_Read(const Pin_Descriptor_t *pin){
 	if(!pin || !pin->port) return 0;
 	return (pin->port->IDR & pin->pin) ? 1 : 0;
 }
+
+//-----------------------------------------------------------------------------
+// Fast aliases (source compatibility; identical atomic implementation)
+//-----------------------------------------------------------------------------
+osStatus_t	PIN_Set_F(const Pin_Descriptor_t *pin)    { return PIN_Set(pin);    }
+osStatus_t	PIN_Reset_F(const Pin_Descriptor_t *pin)  { return PIN_Reset(pin);  }
+osStatus_t	PIN_Toggle_F(const Pin_Descriptor_t *pin) { return PIN_Toggle(pin); }
+uint8_t		PIN_Read_F(const Pin_Descriptor_t *pin)   { return PIN_Read(pin);   }
 
 //-----------------------------------------------------------------------------
 // Acquires GPIO bus mutex
@@ -306,9 +260,9 @@ uint8_t		PIN_GPIO_Mutex_Is_Locked(void){
 }
 
 //-----------------------------------------------------------------------------
-// Pulses PROG_B line to trigger FPGA reconfiguration
+// Pulses PROG_B line (private helper; public entry point is FPGA_Reset_With_Check)
 //-----------------------------------------------------------------------------
-osStatus_t	FPGA_Reset_OS(uint32_t reset_time_ms){
+static osStatus_t	FPGA_Reset_OS(uint32_t reset_time_ms){
 	PIN_Reset_F(&pin_mr_prog);
 	PIN_Delay(reset_time_ms);
 	PIN_Set_F(&pin_mr_prog);
@@ -347,9 +301,7 @@ uint8_t		FPGA_Is_In_Reset(void){
 // Full hardware reset and wait sequence for FPGA
 //-----------------------------------------------------------------------------
 osStatus_t	FPGA_Reset_With_Check(uint32_t reset_time_ms, uint32_t timeout_ms){
-	PIN_Reset_F(&pin_mr_prog);
-	PIN_Delay(reset_time_ms);
-	PIN_Set_F(&pin_mr_prog);
+	FPGA_Reset_OS(reset_time_ms);
 	return FPGA_Wait_Ready(timeout_ms);
 }
 

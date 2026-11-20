@@ -19,7 +19,6 @@ extern "C" {
 typedef struct {
     GPIO_TypeDef* port;          /*!< GPIO Port (GPIOA, GPIOB, etc.) */
     uint16_t pin;                /*!< Pin Mask (GPIO_PIN_0, etc.) */
-    uint8_t default_state;       /*!< Default Level (0: LOW, 1: HIGH) */
     const char* name;            /*!< Pin Name for diagnostics */
 } Pin_Descriptor_t;
 
@@ -35,8 +34,8 @@ typedef struct {
 
 #define PIN_MGMT_CONFIG_DEFAULT { .debug_enabled = 0 }
 
-#define PIN_DESC(_port, _pin, _def_state, _name) \
-    { .port = _port, .pin = _pin, .default_state = _def_state, .name = _name }
+#define PIN_DESC(_port, _pin, _name) \
+    { .port = _port, .pin = _pin, .name = _name }
 
 extern Pin_Mgmt_Config_t bsp_pin_config;
 
@@ -61,10 +60,8 @@ osStatus_t	PIN_GPIO_Mutex_Acquire(uint32_t timeout);
 osStatus_t	PIN_GPIO_Mutex_Release(void);
 uint8_t		PIN_GPIO_Mutex_Is_Locked(void);
 
-/* FPGA & SPI bus controls */
-osStatus_t	FPGA_Reset_With_Check(uint32_t reset_time_ms, uint32_t timeout_ms);
-uint8_t		FPGA_Is_Ready(void);
-uint8_t		FPGA_Is_In_Reset(void);
+/* FPGA & SPI bus controls: see block below (FPGA_Reset_With_Check, FPGA_Wait_Ready,
+   FPGA_Is_Ready, FPGA_Is_In_Reset) — duplicate declaration block removed */
 
 osStatus_t	SPI_Bus_Configure(SPI_Bus_Mode_t mode);
 osStatus_t	SPI_Bus_Acquire_For_STM32(void);
@@ -78,7 +75,7 @@ osStatus_t	PIN_Blink(const Pin_Descriptor_t *pin, uint8_t count, uint32_t delay_
 
 /* FPGA & SPI bus controls */
 osStatus_t	FPGA_Reset_With_Check(uint32_t reset_time_ms, uint32_t timeout_ms);
-osStatus_t	FPGA_Wait_Ready(uint32_t timeout_ms);  /* <-- ДОБАВИТЬ ЭТУ СТРОКУ */
+osStatus_t	FPGA_Wait_Ready(uint32_t timeout_ms);
 uint8_t		FPGA_Is_Ready(void);
 uint8_t		FPGA_Is_In_Reset(void);
 
@@ -104,7 +101,8 @@ uint8_t		FPGA_Is_In_Reset(void);
 
 /* Hardware Pin Descriptors */
 extern const Pin_Descriptor_t pin_led_green;
-extern const Pin_Descriptor_t pin_clk25mhz;
+/* extern const Pin_Descriptor_t pin_clk25mhz;  FORBIDDEN: PH0 = HSE 25 MHz in,
+   never touch as GPIO (PLL runs from this clock). */
 extern const Pin_Descriptor_t pin_tp1;
 extern const Pin_Descriptor_t pin_tp2;
 extern const Pin_Descriptor_t pin_tp3;
@@ -125,7 +123,8 @@ extern const Pin_Descriptor_t pin_stm32_2_fpga_nss_p; /* Alias -> PB0 */
 extern const Pin_Descriptor_t pin_fpga_2_stm32_misc1;
 extern const Pin_Descriptor_t pin_stm32_2_fpga_nss_d; /* PB2: FPGA DMA CS */
 extern const Pin_Descriptor_t pin_interrupt_fpga;     /* PB10: FPGA IRQ */
-extern const Pin_Descriptor_t pin_mr_fpga;
+/* extern const Pin_Descriptor_t pin_mr_fpga;  NOT DEFINED on this board (legacy from
+   bootloader project). FPGA master reset line here is pin_mr_prog (PB15 / PROG_B). */
 extern const Pin_Descriptor_t pin_mr_prog;           /* PB15: PROG_B */
 extern const Pin_Descriptor_t pin_usart6_debug_tx;
 extern const Pin_Descriptor_t pin_usart6_debug_rx;
@@ -133,8 +132,6 @@ extern const Pin_Descriptor_t pin_usart1_kpa_te;
 extern const Pin_Descriptor_t pin_usart1_kpa_tx;
 extern const Pin_Descriptor_t pin_usart1_kpa_rx;
 extern const Pin_Descriptor_t pin_stlink_detect;
-
-extern const Pin_Descriptor_t pin_usart2_fpga_de;
 
 #ifdef __cplusplus
 }

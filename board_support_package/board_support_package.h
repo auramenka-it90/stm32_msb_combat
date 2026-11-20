@@ -22,9 +22,15 @@
 #include "usefull_define.h"
 
 
-/* 0: Автономная отладка без бутлоадера (0x08000000)
- * 1: Работа под управлением Bootloader (0x08020000) */
-#define APPLICATION_USE_BOOTLOADER      0
+/* 0: Standalone debug without bootloader (0x08000000, linker script STM32F411RETX_FLASH.ld)
+ * 1: Run under Bootloader control (0x08020000, linker script STM32F411RETX_FLASH_BL.ld,
+ *    set Script file in Properties -> MCU GCC Linker -> General to STM32F411RETX_FLASH_BL.ld) */
+#define APPLICATION_USE_BOOTLOADER      1
+
+/* FCS control-output watchdog armed by STM32 at boot (milliseconds, 1..65535).
+   FPGA clears all discrete outputs if no SPI write to FCS happens for this
+   time. Set to 0 to keep the watchdog disabled (bench debug only). */
+#define FPGA_FCS_WD_STARTUP_MS			0U
 
 
 /* ========================================================================= */
@@ -84,6 +90,12 @@ void		bsp_system_reset(void);
 void		ten(bool par);
 
 /* Internal Temperature Measurements */
+extern float	adc_voltage;     /* Temperature sensor voltage, V */
+extern float	cpu_temperature; /* Die temperature, deg C */
+extern float	real_vref;       /* Measured VDDA via VREFINT, V */
+
+
+
 float		Read_Temperature(void);
 
 /* DWT Microsecond Blocking Delay */

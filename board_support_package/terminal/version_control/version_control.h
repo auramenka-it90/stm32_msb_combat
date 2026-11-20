@@ -16,11 +16,11 @@
 /* ========================================================================= */
 
 #define _VC_PRODUCT_NUMBER_     "Mode switching board (MSB)\n"
-#define _VC_BOARD_NUMBER_       "Board:  7198.30.03.100\n"
+#define _VC_BOARD_NUMBER_       "Board:  DIAS.901.02.00.200\n"
 #define _VC_CHIP_DESIGNATION_   "Chip:   DD16 - STM32F411RET6TR\n"
 #define _VC_SOFT_NAME_          "Software: combat\n"
-#define _VC_SOFT_NOTE_          "SW:     produced by mr. Andrew Auramenka\n"
-#define _VC_SOFT_VERSION_       "Ver. 1.0\n"
+#define _VC_SOFT_NOTE_          "Produced by mr. Andrew Auramenka \n"
+#define _VC_SOFT_VERSION_       "Ver. 2.0\n"
 
 /* ========================================================================= */
 /*  PUBLIC API                                                               */

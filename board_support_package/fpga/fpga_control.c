@@ -170,43 +170,6 @@ FPGA_Status_t FPGA_Debug_Set_TP_Mux(FPGA_HandleTypeDef *hbridge, uint8_t tp5_sig
 }
 
 /**
- * @brief  Executes software MultiBoot reboot to Image 2 (Flash 1 MB offset).
- * @note   Flow: Writes 0xAA55 to Reg 0x04 -> Releases SPI to Hi-Z ->
- *         Waits for DONE transition 1->0->1 -> Reclaims SPI -> Verifies 0xDEAD.
- */
-FPGA_Status_t FPGA_Reboot_To_Image2(FPGA_HandleTypeDef *hbridge, uint32_t timeout_ms){
-    FPGA_Status_t status;
-
-    if(!hbridge) return FPGA_ERROR;
-
-    // 1. Send Magic Key 0xAA55 to Register 0x04 to trigger ICAP reboot
-    status = FPGA_Write_Poll(hbridge, ADDR_S_DEBUG_RECONFIG, FPGA_DEBUG_RECONFIG_KEY, 100);
-    if(status != FPGA_OK){
-        return status;
-    }
-
-    // 2. Immediately release SPI bus into Hi-Z mode for FPGA Flash configuration
-    SPI_Bus_Release_To_FPGA();
-
-    // 3. Small pause to allow Spartan-6 to clear SRAM and drop DONE pin to 0
-    PIN_Delay(10);
-
-    // 4. Wait for FPGA DONE pin (PA1) to become 1
-    if(FPGA_Wait_Ready(timeout_ms) != osOK){
-        SPI_Bus_Acquire_For_STM32(); // Fallback restore
-        return FPGA_TIMEOUT;
-    }
-
-    // 5. Re-acquire SPI1 bus in Master mode
-    if(SPI_Bus_Acquire_For_STM32() != osOK){
-        return FPGA_ERROR;
-    }
-
-    // 6. Verify SPI communication with new loaded image (checks 0xDEAD)
-    return FPGA_Debug_Verify(hbridge, 100);
-}
-
-/**
  * @brief  Non-blocking running lights diagnostic sequence for on-board LEDs.
  * @note   Shifts active LED (Red -> Yellow -> Green) every 200 ms.
  */
@@ -240,23 +203,53 @@ FPGA_Status_t FPGA_Debug_Running_Lights(FPGA_HandleTypeDef *hbridge, uint32_t ti
 /* ========================================================================= */
 
 /**
- * @brief  Reads all 31 debounced discrete inputs from FPGA FCS module.
- * @param  status_1: Lower 16 inputs (DR[10:0] sensor bus + HEF..GM ammo inputs).
- * @param  status_2: Upper 15 inputs (CC..SCF_ON_ADD) + Reset-Dominant JK latch at MSB.
+ * @brief  Verifies FCS slave presence by reading its signature (0x55AA).
+ * @note   Target: Device ID 2, Reg 0x02 (read-only). Localizes a missing or
+ *         unresponsive FCS slave independently of the global bus check
+ *         (Debug module 0xDEAD).
  */
-FPGA_Status_t FPGA_FCS_Read_Inputs(FPGA_HandleTypeDef *hbridge, uint16_t *status_1, uint16_t *status_2, uint32_t timeout_ms){
+FPGA_Status_t FPGA_FCS_Verify(FPGA_HandleTypeDef *hbridge, uint32_t timeout_ms){
+    uint16_t sig_val = 0;
     FPGA_Status_t status;
 
-    if(!status_1 || !status_2){
-        return FPGA_ERROR;
-    }
-
-    status = FPGA_Read_Poll(hbridge, ADDR_S_FCS_STATUS_1, status_1, timeout_ms);
+    status = FPGA_Read_Poll(hbridge, ADDR_S_FCS_CONST, &sig_val, timeout_ms);
     if(status != FPGA_OK){
         return status;
     }
 
-    return FPGA_Read_Poll(hbridge, ADDR_S_FCS_STATUS_2, status_2, timeout_ms);
+    if(sig_val != FPGA_FCS_CONST_VAL){
+        return FPGA_ERROR; // Signature mismatch (wrong device, bad bitstream, or bus fault)
+    }
+
+    return FPGA_OK;
+}
+
+/**
+ * @brief  Reads all 31 debounced discrete inputs from FPGA FCS module.
+ * @param  status_1: Lower 16 inputs (DR[10:0] sensor bus + HEF..GM ammo inputs).
+ * @param  status_2: Upper 15 inputs (CC..SCF_ON_ADD) + Reset-Dominant JK latch at MSB.
+ * @note   Both words are captured under one bridge mutex (recursive):
+ *         a 100 Hz hold pulse between the two reads would otherwise mix
+ *         two different sample-and-hold snapshots into one "pair".
+ */
+FPGA_Status_t FPGA_FCS_Read_Inputs(FPGA_HandleTypeDef *hbridge, uint16_t *status_1, uint16_t *status_2, uint32_t timeout_ms){
+    FPGA_Status_t status;
+
+    if(!hbridge || !hbridge->mutex_id || !status_1 || !status_2){
+        return FPGA_ERROR;
+    }
+
+    if(osMutexAcquire(hbridge->mutex_id, timeout_ms) != osOK){
+        return FPGA_BUSY;
+    }
+
+    status = FPGA_Read_Poll(hbridge, ADDR_S_FCS_STATUS_1, status_1, timeout_ms);
+    if(status == FPGA_OK){
+        status = FPGA_Read_Poll(hbridge, ADDR_S_FCS_STATUS_2, status_2, timeout_ms);
+    }
+
+    osMutexRelease(hbridge->mutex_id);
+    return status;
 }
 
 /**
@@ -315,6 +308,15 @@ FPGA_Status_t FPGA_FCS_Set_Latch_Enable(FPGA_HandleTypeDef *hbridge, bool enable
     return FPGA_Write_Poll(hbridge, ADDR_S_FCS_LATCH_EN, val, timeout_ms);
 }
 
+/**
+ * @brief  Arms/disarms the FPGA control-output watchdog (Reg 0x03, Device 2).
+ * @param  timeout_ms  1..65535: clear discrete FCS outputs after this silence;
+ *                     0: disable the watchdog. Reloaded by any FCS write.
+ */
+FPGA_Status_t FPGA_FCS_Set_Watchdog(FPGA_HandleTypeDef *hbridge, uint16_t timeout_ms, uint32_t spi_timeout_ms){
+    return FPGA_Write_Poll(hbridge, ADDR_S_FCS_WD_TIMEOUT, timeout_ms, spi_timeout_ms);
+}
+
 /* ========================================================================= */
 /*  SECTION 3: INTERRUPT CONTROLLER APIS (Device ID = 3)                     */
 /* ========================================================================= */
@@ -354,4 +356,28 @@ FPGA_Status_t FPGA_Int_Get_Pending(FPGA_HandleTypeDef *hbridge, uint16_t *pendin
  */
 FPGA_Status_t FPGA_Int_Clear_Pending(FPGA_HandleTypeDef *hbridge, uint16_t clear_mask, uint32_t timeout_ms){
     return FPGA_Write_Poll(hbridge, ADDR_S_INT_PENDING, clear_mask, timeout_ms);
+}
+
+/**
+ * @brief  Reads RAW (unmasked) pending interrupt flags for diagnostics.
+ * @note   Target: Reg 0x04. Shows events accumulated while the line was masked
+ *         (audit of the stale-pending burst on enable). Cleared via Reg 0x00.
+ */
+FPGA_Status_t FPGA_Int_Get_Raw_Pending(FPGA_HandleTypeDef *hbridge, uint16_t *raw_pending, uint32_t timeout_ms){
+    if(!raw_pending){
+        return FPGA_ERROR;
+    }
+    return FPGA_Read_Poll(hbridge, ADDR_S_INT_PENDING_RAW, raw_pending, timeout_ms);
+}
+
+/**
+ * @brief  Reads settled live IRQ input levels (post-synchronizer) for link debug.
+ * @note   Target: Reg 0x05. Answers "does the source signal toggle at all?"
+ *         without enabling or clearing anything.
+ */
+FPGA_Status_t FPGA_Int_Get_Levels(FPGA_HandleTypeDef *hbridge, uint16_t *levels, uint32_t timeout_ms){
+    if(!levels){
+        return FPGA_ERROR;
+    }
+    return FPGA_Read_Poll(hbridge, ADDR_S_INT_LEVELS, levels, timeout_ms);
 }

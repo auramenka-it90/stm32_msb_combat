@@ -97,6 +97,12 @@ FPGA_Status_t	FPGA_Write_Poll(FPGA_HandleTypeDef *hbridge, uint16_t addr, uint16
 
 	FPGA_CS_HIGH(hbridge);
 
+	/* On a failed transfer HAL leaves the peripheral BUSY with stale FIFO/OVR.
+	   Without Abort every later call fails with HAL_BUSY until board reset. */
+	if(hal_status != HAL_OK){
+		HAL_SPI_Abort(hbridge->hspi);
+	}
+
 	osMutexRelease(hbridge->mutex_id);
 
 	if(hal_status == HAL_TIMEOUT) return FPGA_TIMEOUT;
@@ -131,6 +137,12 @@ FPGA_Status_t	FPGA_Read_Poll(FPGA_HandleTypeDef *hbridge, uint16_t addr, uint16_
 	                                     (uint8_t*)hbridge->rx_buf, 2, timeout_ms);
 
 	FPGA_CS_HIGH(hbridge);
+
+	/* On a failed transfer HAL leaves the peripheral BUSY with stale FIFO/OVR.
+	   Without Abort every later call fails with HAL_BUSY until board reset. */
+	if(hal_status != HAL_OK){
+		HAL_SPI_Abort(hbridge->hspi);
+	}
 
 	if(hal_status == HAL_OK){
 		*data = hbridge->rx_buf[1]; // Captured FPGA response is in the 2nd slot

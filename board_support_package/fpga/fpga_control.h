@@ -54,15 +54,15 @@ FPGA_Status_t FPGA_Debug_Set_UART_Mux(FPGA_HandleTypeDef *hbridge, FPGA_Uart_Por
 // Configures dynamic signal routing for diagnostic test points TP5, TP6, TP7
 FPGA_Status_t FPGA_Debug_Set_TP_Mux(FPGA_HandleTypeDef *hbridge, uint8_t tp5_sig, uint8_t tp6_sig, uint8_t tp7_sig, uint32_t timeout_ms);
 
-// Triggers FPGA MultiBoot reconfiguration to Image 2 (Flash 1 MB offset)
-FPGA_Status_t FPGA_Reboot_To_Image2(FPGA_HandleTypeDef *hbridge, uint32_t timeout_ms);
-
 // Non-blocking running lights diagnostic sequence
 FPGA_Status_t FPGA_Debug_Running_Lights(FPGA_HandleTypeDef *hbridge, uint32_t timeout_ms);
 
 /* ========================================================================= */
 /*  FCS MODULE APIS (Device ID = 2)                                          */
 /* ========================================================================= */
+
+// Verifies FCS slave presence by checking its signature constant (0x55AA)
+FPGA_Status_t FPGA_FCS_Verify(FPGA_HandleTypeDef *hbridge, uint32_t timeout_ms);
 
 // Reads all 31 discrete inputs (Status 1: DR+Ammo, Status 2: Flags+JK)
 FPGA_Status_t FPGA_FCS_Read_Inputs(FPGA_HandleTypeDef *hbridge, uint16_t *status_1, uint16_t *status_2, uint32_t timeout_ms);
@@ -79,6 +79,7 @@ FPGA_Status_t FPGA_FCS_Set_Control_Outputs(FPGA_HandleTypeDef *hbridge, uint8_t 
 
 // Selects between Sample-and-Hold Latch (1) and Real-Time Combinatorial Bypass (0)
 FPGA_Status_t FPGA_FCS_Set_Latch_Enable(FPGA_HandleTypeDef *hbridge, bool enable, uint32_t timeout_ms);
+FPGA_Status_t FPGA_FCS_Set_Watchdog(FPGA_HandleTypeDef *hbridge, uint16_t timeout_ms, uint32_t spi_timeout_ms);
 
 /* ========================================================================= */
 /*  INTERRUPT CONTROLLER APIS (Device ID = 3)                                */
@@ -93,6 +94,12 @@ FPGA_Status_t FPGA_Int_Get_Pending(FPGA_HandleTypeDef *hbridge, uint16_t *pendin
 
 // Clears pending interrupt flags using Write-1-to-Clear (W1C) strategy
 FPGA_Status_t FPGA_Int_Clear_Pending(FPGA_HandleTypeDef *hbridge, uint16_t clear_mask, uint32_t timeout_ms);
+
+// Reads RAW unmasked pending flags (diagnostics, Reg 0x04)
+FPGA_Status_t FPGA_Int_Get_Raw_Pending(FPGA_HandleTypeDef *hbridge, uint16_t *raw_pending, uint32_t timeout_ms);
+
+// Reads settled live IRQ input levels, post-synchronizer (diagnostics, Reg 0x05)
+FPGA_Status_t FPGA_Int_Get_Levels(FPGA_HandleTypeDef *hbridge, uint16_t *levels, uint32_t timeout_ms);
 
 #ifdef __cplusplus
 }

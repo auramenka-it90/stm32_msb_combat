@@ -52,11 +52,7 @@
 
 /* Private variables ---------------------------------------------------------*/
 /* USER CODE BEGIN Variables */
-extern float cpu_temperature;
-extern float adc_voltage;
 uint32_t fcs_task_counter = 0;
-
-extern FPGA_HandleTypeDef hfpga_bridge;
 /* USER CODE END Variables */
 /* Definitions for defaultTask */
 osThreadId_t defaultTaskHandle;
@@ -165,11 +161,11 @@ void StartDefaultTask(void *argument)
 		/* All hardware tests passed: Enter main FCS real-time loop */
 		for (;;) {
 			/* ========================================================= */
-			/* ТЕСТОВЫЙ ИМПУЛЬС 10 мкс ДЛЯ ОСЦИЛЛОГРАФА НА TP2 (PC1)     */
+			/* TEST PULSE 10 us FOR OSCILLOSCOPE ON TP2 (PC1)           */
 			/* ========================================================= */
 			/*
 			PIN_Set_F(&pin_tp2);  TP2 -> HIGH (1)
-			delay_us(10);  Ровно 10 микросекунд через DWT
+			delay_us(10);  Exactly 10 microseconds via DWT
 			PIN_Reset_F(&pin_tp2);  TP2 -> LOW (0)
 			 */
 
@@ -178,14 +174,12 @@ void StartDefaultTask(void *argument)
 			PIN_Toggle_F(&pin_tp1);   /* Fast Test Point 1 heartbeat toggle */
 		}
 	} else {
-		/* Hardware fault detected: Blink FPGA Red LED and on-board Green LED */
+		/* Hardware fault detected: blink on-board LED only.
+		   FPGA is not touched here - it may be the faulty unit itself. */
 		for (;;) {
 			PIN_Set_F(&pin_led_green);
-			FPGA_Debug_Write_LEDs(&hfpga_bridge, ON, OFF, OFF, 10);
 			osDelay(500);
-
 			PIN_Reset_F(&pin_led_green);
-			FPGA_Debug_Write_LEDs(&hfpga_bridge, OFF, OFF, OFF, 10);
 			osDelay(500);
 		}
 	}
@@ -230,7 +224,8 @@ void StartTemperatureTask(void *argument)
 
 	/* Infinite loop (Deterministic 100 ms rate) */
 	for (;;) {
-		cpu_temperature = Read_Temperature();
+		/* Updates global cpu_temperature internally */
+		Read_Temperature();
 
 		last_wake_time += (100U * osKernelGetTickFreq()) / 1000U;
 		osDelayUntil(last_wake_time);

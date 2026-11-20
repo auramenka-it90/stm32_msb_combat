@@ -1,5 +1,5 @@
 @echo off
-setlocal
+setlocal enabledelayedexpansion
 set BIN_FILE=%~1
 set SCRIPT_DIR=%~dp0
 
@@ -7,26 +7,26 @@ set SCRIPT_DIR=%~dp0
 py --version >nul 2>&1
 if %errorlevel% equ 0 (
     py "%SCRIPT_DIR%patch_crc.py" "%BIN_FILE%"
-    exit /b %errorlevel%
+    exit /b !errorlevel!
 )
 
 :: 2. Проверяем системный python в PATH
 python --version >nul 2>&1
 if %errorlevel% equ 0 (
     python "%SCRIPT_DIR%patch_crc.py" "%BIN_FILE%"
-    exit /b %errorlevel%
+    exit /b !errorlevel!
 )
 
 :: 3. Проверяем локальные пути установки Python текущего пользователя
 if exist "%LOCALAPPDATA%\Python\bin\python.exe" (
     "%LOCALAPPDATA%\Python\bin\python.exe" "%SCRIPT_DIR%patch_crc.py" "%BIN_FILE%"
-    exit /b %errorlevel%
+    exit /b !errorlevel!
 )
 
 for /d %%D in ("%LOCALAPPDATA%\Programs\Python\Python3*") do (
     if exist "%%D\python.exe" (
         "%%D\python.exe" "%SCRIPT_DIR%patch_crc.py" "%BIN_FILE%"
-        exit /b %errorlevel%
+        exit /b !errorlevel!
     )
 )
 
@@ -34,7 +34,7 @@ for /d %%D in ("%LOCALAPPDATA%\Programs\Python\Python3*") do (
 for /d %%D in ("C:\Python3*") do (
     if exist "%%D\python.exe" (
         "%%D\python.exe" "%SCRIPT_DIR%patch_crc.py" "%BIN_FILE%"
-        exit /b %errorlevel%
+        exit /b !errorlevel!
     )
 )
 
