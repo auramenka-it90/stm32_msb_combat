@@ -21,27 +21,22 @@
 
 ## Структура репозитория
 
-```
-C_QWEN/
-├── Core/                       генерация CubeIDE, main, FreeRTOS, периферия
-├── board_support_package/
-│   ├── board_support_package.[ch]   конфигурация BSP, флаг APPLICATION_USE_BOOTLOADER
-│   ├── fire_control_system/         fcs.c — рабочий цикл 50 Гц: чтение STATUS ПЛИС,
-│   │                                запись приказов BC в FCS_CONTROL, контроль сторожа
-│   ├── fpga/                        fpga_control.c, fpga_reg_map.h,
-│   │                                stm32_2_fpga_spi_bridge/ — драйвер SPI-моста ПЛИС
-│   ├── host/                        host.c — протокольный обмен с ВС (RS-485)
-│   ├── terminal/                    терминал eAssist: dspa, terminal_signals, wrapper,
-│   │                                version_control (встраивание версии из git)
-│   ├── memory/                      внутренняя Flash (конфигурация, служебные данные)
-│   ├── pin_management/              дескрипторы выводов + gpio_fallbacks.h
-│   └── std_com/                     транспорт UART + DMA
-├── Middlewares/, Drivers/      FreeRTOS, HAL/CMSIS
-├── msb_combat_qwen.ioc         проект CubeIDE (STM32F411RE)
-├── STM32F411RETX_FLASH.ld      файл сегментации: без загрузчика (0x08000000, 512 К)
-├── STM32F411RETX_FLASH_BL.ld   файл сегментации: под загрузчик (0x08020000, 256 К)
-└── patch_crc.py / patch_crc.bat   подготовка образа: заполнение размера и CRC32
-```
+| Путь | Назначение |
+| :--- | :--- |
+| `Core/` | генерация CubeIDE: main, FreeRTOS, периферия |
+| `board_support_package/board_support_package.[ch]` | конфигурация BSP, флаг `APPLICATION_USE_BOOTLOADER` |
+| `board_support_package/fire_control_system/` | `fcs.c` — рабочий цикл 50 Гц: чтение STATUS ПЛИС, запись приказов BC в `FCS_CONTROL`, контроль сторожа выходов |
+| `board_support_package/fpga/` | `fpga_control.c`, `fpga_reg_map.h`, `stm32_2_fpga_spi_bridge/` — драйвер SPI-моста ПЛИС |
+| `board_support_package/host/` | `host.c` — протокольный обмен с ВС (RS-485) |
+| `board_support_package/terminal/` | терминал eAssist: `dspa`, `terminal_signals`, `wrapper`, `version_control` (встраивание версии из git) |
+| `board_support_package/memory/` | внутренняя Flash (конфигурация, служебные данные) |
+| `board_support_package/pin_management/` | дескрипторы выводов + `gpio_fallbacks.h` |
+| `board_support_package/std_com/` | транспорт UART + DMA |
+| `Middlewares/`, `Drivers/` | FreeRTOS, HAL/CMSIS |
+| `msb_combat_qwen.ioc` | проект CubeIDE (STM32F411RE) |
+| `STM32F411RETX_FLASH.ld` | файл сегментации: без загрузчика (0x08000000, 512 К) |
+| `STM32F411RETX_FLASH_BL.ld` | файл сегментации: под загрузчик (0x08020000, 256 К) |
+| `patch_crc.py`, `patch_crc.bat` | подготовка образа: заполнение размера и CRC32 |
 
 ## Алгоритм работы (кратко)
 
