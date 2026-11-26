@@ -14,39 +14,47 @@
 
 | Узел | Подключение |
 | :--- | :--- |
-| ПЛИС Xilinx Spartan-6 (31 вход / 8 выходов, коммутатор RS-485) | SPI1 (регистровый мост, 3 устройства), линия IRQ |
-| Линия обмена с ВС | USART2 → приёмопередатчики RS-485/RS-422 (DD19/DD20, выбор канала регистром ПЛИС) |
+| ПЛИС Xilinx Spartan-6 (31 вход / 8 выходов, коммутатор RS-485) | SPI1, регистровый мост (3 устройства), CS = PB0 (`pin_fpga_cs`) |
+| Линия обмена с БК | USART2 → приёмопередатчики RS-485/RS-422 (DD19/DD20, выбор канала регистром ПЛИС) |
 | Терминал eAssist/DSPA | USART1 + DMA |
 | ОСРВ | FreeRTOS (CMSIS-RTOS v2) |
 
 ## Структура репозитория
 
-| Путь | Назначение |
-| :--- | :--- |
-| `Core/` | генерация CubeIDE: main, FreeRTOS, периферия |
-| `board_support_package/board_support_package.[ch]` | конфигурация BSP, флаг `APPLICATION_USE_BOOTLOADER` |
-| `board_support_package/fire_control_system/` | `fcs.c` — рабочий цикл 50 Гц: чтение STATUS ПЛИС, запись приказов BC в `FCS_CONTROL`, контроль сторожа выходов |
-| `board_support_package/fpga/` | `fpga_control.c`, `fpga_reg_map.h`, `stm32_2_fpga_spi_bridge/` — драйвер SPI-моста ПЛИС |
-| `board_support_package/host/` | `host.c` — протокольный обмен с ВС (RS-485) |
-| `board_support_package/terminal/` | терминал eAssist: `dspa`, `terminal_signals`, `wrapper`, `version_control` (встраивание версии из git) |
-| `board_support_package/memory/` | внутренняя Flash (конфигурация, служебные данные) |
-| `board_support_package/pin_management/` | дескрипторы выводов + `gpio_fallbacks.h` |
-| `board_support_package/std_com/` | транспорт UART + DMA |
-| `Middlewares/`, `Drivers/` | FreeRTOS, HAL/CMSIS |
-| `msb_combat_qwen.ioc` | проект CubeIDE (STM32F411RE) |
-| `STM32F411RETX_FLASH.ld` | файл сегментации: без загрузчика (0x08000000, 512 К) |
-| `STM32F411RETX_FLASH_BL.ld` | файл сегментации: под загрузчик (0x08020000, 256 К) |
-| `patch_crc.py`, `patch_crc.bat` | подготовка образа: заполнение размера и CRC32 |
+```
+C_QWEN/
+|-- Core/                          генерация CubeIDE: main, FreeRTOS, периферия
+|-- board_support_package/
+|   |-- board_support_package.c/.h конфигурация BSP, APPLICATION_USE_BOOTLOADER
+|   |-- fire_control_system/       fcs.c: цикл 50 Гц, реакция на приказы BC
+|   |-- fpga/                      fpga_control.c, fpga_reg_map.h,
+|   |                              stm32_2_fpga_spi_bridge/ - драйвер SPI-моста
+|   |-- host/                      host.c: протокол MSB<->BC, USART2 921600 8E1
+|   |-- terminal/                  терминал eAssist: dspa, terminal_signals,
+|   |   |                          wrapper
+|   |   `-- version_control/       версия ПО и оборудования платы
+|   |-- memory/configuration/      конфигурация устройства (внутр. Flash 0x08060000)
+|   |-- pin_management/            дескрипторы выводов, gpio_fallbacks.h
+|   `-- std_com/                   транспорт UART + DMA
+|-- Middlewares/                   FreeRTOS
+|-- Drivers/                       HAL/CMSIS
+|-- msb_combat_qwen.ioc            проект CubeIDE (STM32F411RE)
+|-- STM32F411RETX_FLASH.ld         сегментация: без загрузчика (0x08000000, 512K)
+|-- STM32F411RETX_FLASH_BL.ld      сегментация: под загрузчик (0x08020000, 256K)
+`-- patch_crc.py / patch_crc.bat   подготовка образа: размер и CRC32
+```
 
 ## Алгоритм работы (кратко)
 
-1. Инициализация (`fcs_init_fpga_hardware`): SPI-мост, выбор канала RS-485
-   (DD19/DD20), период выборки 10 мс, маски инверсии входов, режим
-   выборки-хранения 100 Гц, сторож выходов; прерывания от ПЛИС запрещены,
-   контроль выполняется опросом.
-2. Цикл FCS с периодом 50 Гц: чтение STATUS_1/2 → передача состояний входов
-   в протоколе MSB→BC; приём пакетов BC → немедленная запись `FCS_CONTROL`;
-   каждые 20 мс — сервисная запись, перезапускающая сторож выходов.
+1. Инициализация (`fcs_init_fpga_hardware`, fcs.c): канал RS-485 из конфига
+   (`uart_mux`), период выборки (`latch_period_ms`, 10 мс), маски инверсии
+   входов, сброс подмен, выборка-хранение 100 Гц, сторож выходов, очистка и
+   запрет прерываний ПЛИС (архитектура опросная).
+2. Задача `fcs_task`: период 20 мс (`FCS_TICK_MS`, 50 Гц). Приём байтов BC
+   пробуждает задачу немедленно, приказы записываются в `FCS_CONTROL` сразу
+   (`host_process_rx_pending`). В периодической части: чтение STATUS_1/2,
+   отправка 32-байтного пакета MSB→BC (`host_send_msb_packet`), запись
+   `FCS_CONTROL` (перезапуск сторожа выходов), контроль вооружения приёма DMA.
 3. Протокольная логика полностью в STM32; ПЛИС выполняет только функции
    регистрового ввода-вывода.
 
